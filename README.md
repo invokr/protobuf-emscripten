@@ -1,13 +1,10 @@
 # protobuf-emscripten
 
-
-## About
-
-This repository implements the nessecary code for protobuf to run via emscripten.
+This is a version of protobuf that has been patched to support compliation via emscripten.
 
 ## Compiling
 
-The following instructions are for Unix based systems. Compiling on Windows should also work but has not been tested.
+The following instructions are for Unix based systems. Compiling on Windows should also work but has not been tested yet.
 
  - Clone the repository
  - Install autotools and emscripten
@@ -15,9 +12,9 @@ The following instructions are for Unix based systems. Compiling on Windows shou
  - `emconfigure ./configure`
  - `emmake make`
 
-After the last command has generated the shared libraries under src/.libs it will try to execute lt-protoc and fail. This is not a problem but to be expected because the binary in question only contains LLVM-Bytecode. At this point `libprotobuf.so` has already been build and is ready to be used in your project.
+After the last command has generated the shared libraries under src/.libs, it will fail executing lt-protoc. This is to be expected because the binary in question only contains LLVM-Bytecode. At this point `libprotobuf.so` has already been build and is ready to be used in your project.
 
-*Important:* The protoc binary build with `emmake` is not usable. Because the generated code does not need to be changed, you can just use any protoc. 
+*Important:* The protoc binary build with `emmake` is not usable. Please use a seperate protoc that has been build with a C++ compiler.
 
 ## License
 
