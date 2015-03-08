@@ -1,7 +1,7 @@
 // This file is an internal atomic implementation, use atomicops.h instead.
 
 #ifndef GOOGLE_PROTOBUF_ATOMICOPS_INTERNALS_EMSCRIPTEN_H_
-#define GOOGLE_PROTOBUF_ATOMICOPS_INTERNALS_EMSCRIPTEN_GCC_H_
+#define GOOGLE_PROTOBUF_ATOMICOPS_INTERNALS_EMSCRIPTEN_H_
 
 namespace google {
 namespace protobuf {
