@@ -1,3 +1,37 @@
+# Files regenrated by make
+Makefile
+config.h
+config.log
+config.status
+conformance/.deps/
+conformance/Makefile
+gtest/Makefile
+gtest/build-aux/config.h
+gtest/build-aux/stamp-h1
+gtest/config.log
+gtest/config.status
+gtest/fused-src/
+gtest/libtool
+gtest/samples/.deps/
+gtest/scripts/gtest-config
+gtest/src/.deps/
+gtest/test/.deps/
+libtool
+protobuf-lite.pc
+protobuf.pc
+src/Makefile
+src/google/protobuf/.deps/
+src/google/protobuf/compiler/.deps/
+src/google/protobuf/compiler/cpp/.deps/
+src/google/protobuf/compiler/java/.deps/
+src/google/protobuf/compiler/javanano/.deps/
+src/google/protobuf/compiler/python/.deps/
+src/google/protobuf/compiler/ruby/.deps/
+src/google/protobuf/io/.deps/
+src/google/protobuf/stubs/.deps/
+src/google/protobuf/testing/.deps/
+stamp-h1
+
 # Files regenrated by autogen
 Makefile.in
 aclocal.m4
