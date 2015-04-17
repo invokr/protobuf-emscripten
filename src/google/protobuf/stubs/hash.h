@@ -87,6 +87,19 @@ struct hash<const char*> {
   }
 };
 
+#if defined(EMSCRIPTEN)
+
+template <typename Key, typename Data,
+          typename HashFcn = hash<Key>,
+          typename EqualKey = int,
+          typename Alloc = void >
+class hash_map : public std::map<Key, Data, HashFcn> {
+ public:
+  hash_map(int = 0, const HashFcn& = HashFcn(), const EqualKey& = EqualKey()) {}
+};
+
+#elif
+
 template <typename Key, typename Data,
           typename HashFcn = hash<Key>,
           typename EqualKey = std::equal_to<Key>,
@@ -96,6 +109,8 @@ class hash_map : public std::map<Key, Data, HashFcn, EqualKey, Alloc> {
   hash_map(int = 0, const HashFcn& = HashFcn(), const EqualKey& = EqualKey(),
            const Alloc& = Alloc()) {}
 };
+
+#endif
 
 template <typename Key,
           typename HashFcn = hash<Key>,
