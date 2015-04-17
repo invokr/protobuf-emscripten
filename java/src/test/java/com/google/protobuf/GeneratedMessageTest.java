@@ -1,6 +1,6 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// http://code.google.com/p/protobuf/
+// https://developers.google.com/protocol-buffers/
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -45,6 +45,9 @@ import protobuf_unittest.NonNestedExtension.MyNonNestedExtension;
 import protobuf_unittest.NonNestedExtensionLite;
 import protobuf_unittest.NonNestedExtensionLite.MessageLiteToBeExtended;
 import protobuf_unittest.NonNestedExtensionLite.MyNonNestedExtensionLite;
+import protobuf_unittest.OuterClassNameTest2OuterClass;
+import protobuf_unittest.OuterClassNameTest3OuterClass;
+import protobuf_unittest.OuterClassNameTestOuterClass;
 import protobuf_unittest.ServiceWithNoOuter;
 import protobuf_unittest.UnittestOptimizeFor.TestOptimizedForSize;
 import protobuf_unittest.UnittestOptimizeFor.TestOptionalOptimizedForSize;
@@ -53,11 +56,13 @@ import protobuf_unittest.UnittestProto;
 import protobuf_unittest.UnittestProto.ForeignEnum;
 import protobuf_unittest.UnittestProto.ForeignMessage;
 import protobuf_unittest.UnittestProto.ForeignMessageOrBuilder;
+import protobuf_unittest.UnittestProto.NestedTestAllTypes;
 import protobuf_unittest.UnittestProto.TestAllExtensions;
 import protobuf_unittest.UnittestProto.TestAllTypes;
 import protobuf_unittest.UnittestProto.TestAllTypes.NestedMessage;
 import protobuf_unittest.UnittestProto.TestAllTypesOrBuilder;
 import protobuf_unittest.UnittestProto.TestExtremeDefaultValues;
+import protobuf_unittest.UnittestProto.TestOneof2;
 import protobuf_unittest.UnittestProto.TestPackedTypes;
 import protobuf_unittest.UnittestProto.TestUnpackedTypes;
 
@@ -69,6 +74,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -152,15 +158,12 @@ public class GeneratedMessageTest extends TestCase {
   public void testProtosShareRepeatedArraysIfDidntChange() throws Exception {
     TestAllTypes.Builder builder = TestAllTypes.newBuilder();
     builder.addRepeatedInt32(100);
-    builder.addRepeatedImportEnum(UnittestImport.ImportEnum.IMPORT_BAR);
     builder.addRepeatedForeignMessage(ForeignMessage.getDefaultInstance());
 
     TestAllTypes value1 = builder.build();
     TestAllTypes value2 = value1.toBuilder().build();
 
     assertSame(value1.getRepeatedInt32List(), value2.getRepeatedInt32List());
-    assertSame(value1.getRepeatedImportEnumList(),
-        value2.getRepeatedImportEnumList());
     assertSame(value1.getRepeatedForeignMessageList(),
         value2.getRepeatedForeignMessageList());
   }
@@ -399,6 +402,44 @@ public class GeneratedMessageTest extends TestCase {
       // We expect this exception.
     }
   }
+  
+  public void testRepeatedAppendIterateOnlyOnce() throws Exception {
+    // Create a Iterable that can only be iterated once.
+    Iterable<String> stringIterable = new Iterable<String>() {
+      private boolean called = false;
+      @Override
+      public Iterator<String> iterator() {
+        if (called) {
+          throw new IllegalStateException();
+        }
+        called = true;
+        return Arrays.asList("one", "two", "three").iterator();
+      }
+    };
+    TestAllTypes.Builder builder = TestAllTypes.newBuilder();
+    builder.addAllRepeatedString(stringIterable);
+    assertEquals(3, builder.getRepeatedStringCount());
+    assertEquals("one", builder.getRepeatedString(0));
+    assertEquals("two", builder.getRepeatedString(1));
+    assertEquals("three", builder.getRepeatedString(2));
+
+    try {
+      builder.addAllRepeatedString(stringIterable);
+      fail("Exception was not thrown");
+    } catch (IllegalStateException e) {
+      // We expect this exception.
+    }
+  }
+
+  public void testMergeFromOtherRejectsNull() throws Exception {
+    try {
+      TestAllTypes.Builder builder = TestAllTypes.newBuilder();
+      builder.mergeFrom((TestAllTypes) null);
+      fail("Exception was not thrown");
+    } catch (NullPointerException e) {
+      // We expect this exception.
+    }
+  }
 
   public void testSettingForeignMessageUsingBuilder() throws Exception {
     TestAllTypes message = TestAllTypes.newBuilder()
@@ -494,6 +535,34 @@ public class GeneratedMessageTest extends TestCase {
       TestAllTypes.getDefaultInstance());
     reflectionTester.assertClearViaReflection(
       TestAllTypes.newBuilder().build());
+  }
+
+  public void testReflectionGetOneof() throws Exception {
+    TestAllTypes.Builder builder = TestAllTypes.newBuilder();
+    reflectionTester.setAllFieldsViaReflection(builder);
+    Descriptors.OneofDescriptor oneof =
+        TestAllTypes.getDescriptor().getOneofs().get(0);
+    Descriptors.FieldDescriptor field =
+        TestAllTypes.getDescriptor().findFieldByName("oneof_bytes");
+    assertSame(field, builder.getOneofFieldDescriptor(oneof));
+
+    TestAllTypes message = builder.build();
+    assertSame(field, message.getOneofFieldDescriptor(oneof));
+  }
+
+  public void testReflectionClearOneof() throws Exception {
+    TestAllTypes.Builder builder = TestAllTypes.newBuilder();
+    reflectionTester.setAllFieldsViaReflection(builder);
+    Descriptors.OneofDescriptor oneof =
+        TestAllTypes.getDescriptor().getOneofs().get(0);
+    Descriptors.FieldDescriptor field =
+        TestAllTypes.getDescriptor().findFieldByName("oneof_bytes");
+
+    assertTrue(builder.hasOneof(oneof));
+    assertTrue(builder.hasField(field));
+    builder.clearOneof(oneof);
+    assertFalse(builder.hasOneof(oneof));
+    assertFalse(builder.hasField(field));
   }
 
   public void testEnumInterface() throws Exception {
@@ -697,6 +766,15 @@ public class GeneratedMessageTest extends TestCase {
   // =================================================================
   // multiple_files_test
 
+  // Test that custom options of an file level enum are properly initialized.
+  // This test needs to be put before any other access to MultipleFilesTestProto
+  // or messages defined in multiple_files_test.proto because the class loading
+  // order affects initialization process of custom options.
+  public void testEnumValueOptionsInMultipleFilesMode() throws Exception {
+    assertEquals(12345, EnumWithNoOuter.FOO.getValueDescriptor().getOptions()
+        .getExtension(MultipleFilesTestProto.enumValueOption).intValue());
+  }
+
   public void testMultipleFilesOption() throws Exception {
     // We mostly just want to check that things compile.
     MessageWithNoOuter message =
@@ -795,7 +873,7 @@ public class GeneratedMessageTest extends TestCase {
     UnittestProto.TestRecursiveMessage message =
         UnittestProto.TestRecursiveMessage.getDefaultInstance();
     assertTrue(message != null);
-    assertTrue(message.getA() != null);
+    assertNotNull(message.getA());
     assertTrue(message.getA() == message);
   }
 
@@ -1138,6 +1216,444 @@ public class GeneratedMessageTest extends TestCase {
     try {
       builder.getFieldBuilder(
           descriptor.findFieldByName("repeated_nested_message"));
+      fail("Exception was not thrown");
+    } catch (UnsupportedOperationException e) {
+      // We expect this exception.
+    }
+  }
+
+  // Test that when the default outer class name conflicts with another type
+  // defined in the proto the compiler will append a suffix to avoid the
+  // conflict.
+  public void testConflictingOuterClassName() {
+    // We just need to make sure we can refer to the outer class with the
+    // expected name. There is nothing else to test.
+    OuterClassNameTestOuterClass.OuterClassNameTest message =
+        OuterClassNameTestOuterClass.OuterClassNameTest.newBuilder().build();
+    assertTrue(message.getDescriptorForType() ==
+        OuterClassNameTestOuterClass.OuterClassNameTest.getDescriptor());
+
+    OuterClassNameTest2OuterClass.TestMessage2.NestedMessage.OuterClassNameTest2
+        message2 = OuterClassNameTest2OuterClass.TestMessage2.NestedMessage
+            .OuterClassNameTest2.newBuilder().build();
+    assertEquals(0, message2.getSerializedSize());
+
+    OuterClassNameTest3OuterClass.TestMessage3.NestedMessage.OuterClassNameTest3
+        enumValue = OuterClassNameTest3OuterClass.TestMessage3.NestedMessage
+            .OuterClassNameTest3.DUMMY_VALUE;
+    assertEquals(1, enumValue.getNumber());
+  }
+
+  // =================================================================
+  // oneof generated code test
+  public void testOneofEnumCase() throws Exception {
+    TestOneof2 message = TestOneof2.newBuilder()
+        .setFooInt(123).setFooString("foo").setFooCord("bar").build();
+    TestUtil.assertAtMostOneFieldSetOneof(message);
+  }
+
+  public void testClearOneof() throws Exception {
+    TestOneof2.Builder builder = TestOneof2.newBuilder().setFooInt(123);
+    assertEquals(TestOneof2.FooCase.FOO_INT, builder.getFooCase());
+    builder.clearFoo();
+    assertEquals(TestOneof2.FooCase.FOO_NOT_SET, builder.getFooCase());
+  }
+
+  public void testSetOneofClearsOthers() throws Exception {
+    TestOneof2.Builder builder = TestOneof2.newBuilder();
+    TestOneof2 message =
+        builder.setFooInt(123).setFooString("foo").buildPartial();
+    assertTrue(message.hasFooString());
+    TestUtil.assertAtMostOneFieldSetOneof(message);
+
+    message = builder.setFooCord("bar").buildPartial();
+    assertTrue(message.hasFooCord());
+    TestUtil.assertAtMostOneFieldSetOneof(message);
+
+    message = builder.setFooStringPiece("baz").buildPartial();
+    assertTrue(message.hasFooStringPiece());
+    TestUtil.assertAtMostOneFieldSetOneof(message);
+
+    message = builder.setFooBytes(TestUtil.toBytes("qux")).buildPartial();
+    assertTrue(message.hasFooBytes());
+    TestUtil.assertAtMostOneFieldSetOneof(message);
+
+    message = builder.setFooEnum(TestOneof2.NestedEnum.FOO).buildPartial();
+    assertTrue(message.hasFooEnum());
+    TestUtil.assertAtMostOneFieldSetOneof(message);
+
+    message = builder.setFooMessage(
+        TestOneof2.NestedMessage.newBuilder().setQuxInt(234).build()).buildPartial();
+    assertTrue(message.hasFooMessage());
+    TestUtil.assertAtMostOneFieldSetOneof(message);
+
+    message = builder.setFooInt(123).buildPartial();
+    assertTrue(message.hasFooInt());
+    TestUtil.assertAtMostOneFieldSetOneof(message);
+  }
+
+  public void testOneofTypes() throws Exception {
+    // Primitive
+    {
+      TestOneof2.Builder builder = TestOneof2.newBuilder();
+      assertEquals(builder.getFooInt(), 0);
+      assertFalse(builder.hasFooInt());
+      assertTrue(builder.setFooInt(123).hasFooInt());
+      assertEquals(builder.getFooInt(), 123);
+      TestOneof2 message = builder.buildPartial();
+      assertTrue(message.hasFooInt());
+      assertEquals(message.getFooInt(), 123);
+
+      assertFalse(builder.clearFooInt().hasFooInt());
+      TestOneof2 message2 = builder.build();
+      assertFalse(message2.hasFooInt());
+      assertEquals(message2.getFooInt(), 0);
+    }
+
+    // Enum
+    {
+      TestOneof2.Builder builder = TestOneof2.newBuilder();
+      assertEquals(builder.getFooEnum(), TestOneof2.NestedEnum.FOO);
+      assertTrue(builder.setFooEnum(TestOneof2.NestedEnum.BAR).hasFooEnum());
+      assertEquals(builder.getFooEnum(), TestOneof2.NestedEnum.BAR);
+      TestOneof2 message = builder.buildPartial();
+      assertTrue(message.hasFooEnum());
+      assertEquals(message.getFooEnum(), TestOneof2.NestedEnum.BAR);
+
+      assertFalse(builder.clearFooEnum().hasFooEnum());
+      TestOneof2 message2 = builder.build();
+      assertFalse(message2.hasFooEnum());
+      assertEquals(message2.getFooEnum(), TestOneof2.NestedEnum.FOO);
+    }
+
+    // String
+    {
+      TestOneof2.Builder builder = TestOneof2.newBuilder();
+      assertEquals(builder.getFooString(), "");
+      builder.setFooString("foo");
+      assertTrue(builder.hasFooString());
+      assertEquals(builder.getFooString(), "foo");
+      TestOneof2 message = builder.buildPartial();
+      assertTrue(message.hasFooString());
+      assertEquals(message.getFooString(), "foo");
+      assertEquals(message.getFooStringBytes(), TestUtil.toBytes("foo"));
+
+      assertFalse(builder.clearFooString().hasFooString());
+      TestOneof2 message2 = builder.buildPartial();
+      assertFalse(message2.hasFooString());
+      assertEquals(message2.getFooString(), "");
+      assertEquals(message2.getFooStringBytes(), TestUtil.toBytes(""));
+
+      // Get method should not change the oneof value.
+      builder.setFooInt(123);
+      assertEquals(builder.getFooString(), "");
+      assertEquals(builder.getFooStringBytes(), TestUtil.toBytes(""));
+      assertEquals(123, builder.getFooInt());
+
+      message = builder.build();
+      assertEquals(message.getFooString(), "");
+      assertEquals(message.getFooStringBytes(), TestUtil.toBytes(""));
+      assertEquals(123, message.getFooInt());
+    }
+
+    // Cord
+    {
+      TestOneof2.Builder builder = TestOneof2.newBuilder();
+      assertEquals(builder.getFooCord(), "");
+      builder.setFooCord("foo");
+      assertTrue(builder.hasFooCord());
+      assertEquals(builder.getFooCord(), "foo");
+      TestOneof2 message = builder.buildPartial();
+      assertTrue(message.hasFooCord());
+      assertEquals(message.getFooCord(), "foo");
+      assertEquals(message.getFooCordBytes(), TestUtil.toBytes("foo"));
+
+      assertFalse(builder.clearFooCord().hasFooCord());
+      TestOneof2 message2 = builder.build();
+      assertFalse(message2.hasFooCord());
+      assertEquals(message2.getFooCord(), "");
+      assertEquals(message2.getFooCordBytes(), TestUtil.toBytes(""));
+    }
+
+    // StringPiece
+    {
+      TestOneof2.Builder builder = TestOneof2.newBuilder();
+      assertEquals(builder.getFooStringPiece(), "");
+      builder.setFooStringPiece("foo");
+      assertTrue(builder.hasFooStringPiece());
+      assertEquals(builder.getFooStringPiece(), "foo");
+      TestOneof2 message = builder.buildPartial();
+      assertTrue(message.hasFooStringPiece());
+      assertEquals(message.getFooStringPiece(), "foo");
+      assertEquals(message.getFooStringPieceBytes(), TestUtil.toBytes("foo"));
+
+      assertFalse(builder.clearFooStringPiece().hasFooStringPiece());
+      TestOneof2 message2 = builder.build();
+      assertFalse(message2.hasFooStringPiece());
+      assertEquals(message2.getFooStringPiece(), "");
+      assertEquals(message2.getFooStringPieceBytes(), TestUtil.toBytes(""));
+    }
+
+    // Message
+    {
+      // set
+      TestOneof2.Builder builder = TestOneof2.newBuilder();
+      assertEquals(builder.getFooMessage().getQuxInt(), 0);
+      builder.setFooMessage(
+          TestOneof2.NestedMessage.newBuilder().setQuxInt(234).build());
+      assertTrue(builder.hasFooMessage());
+      assertEquals(builder.getFooMessage().getQuxInt(), 234);
+      TestOneof2 message = builder.buildPartial();
+      assertTrue(message.hasFooMessage());
+      assertEquals(message.getFooMessage().getQuxInt(), 234);
+
+      // clear
+      assertFalse(builder.clearFooMessage().hasFooString());
+      message = builder.build();
+      assertFalse(message.hasFooMessage());
+      assertEquals(message.getFooMessage().getQuxInt(), 0);
+
+      // nested builder
+      builder = TestOneof2.newBuilder();
+      assertSame(builder.getFooMessageOrBuilder(),
+          TestOneof2.NestedMessage.getDefaultInstance());
+      assertFalse(builder.hasFooMessage());
+      builder.getFooMessageBuilder().setQuxInt(123);
+      assertTrue(builder.hasFooMessage());
+      assertEquals(builder.getFooMessage().getQuxInt(), 123);
+      message = builder.build();
+      assertTrue(message.hasFooMessage());
+      assertEquals(message.getFooMessage().getQuxInt(), 123);
+    }
+
+    // LazyMessage is tested in LazyMessageLiteTest.java
+  }
+
+  public void testOneofMerge() throws Exception {
+    // Primitive Type
+    {
+      TestOneof2.Builder builder = TestOneof2.newBuilder();
+      TestOneof2 message = builder.setFooInt(123).build();
+      TestOneof2 message2 = TestOneof2.newBuilder().mergeFrom(message).build();
+      assertTrue(message2.hasFooInt());
+      assertEquals(message2.getFooInt(), 123);
+    }
+
+    // String
+    {
+      TestOneof2.Builder builder = TestOneof2.newBuilder();
+      TestOneof2 message = builder.setFooString("foo").build();
+      TestOneof2 message2 = TestOneof2.newBuilder().mergeFrom(message).build();
+      assertTrue(message2.hasFooString());
+      assertEquals(message2.getFooString(), "foo");
+    }
+
+    // Enum
+    {
+      TestOneof2.Builder builder = TestOneof2.newBuilder();
+      TestOneof2 message = builder.setFooEnum(TestOneof2.NestedEnum.BAR).build();
+      TestOneof2 message2 = TestOneof2.newBuilder().mergeFrom(message).build();
+      assertTrue(message2.hasFooEnum());
+      assertEquals(message2.getFooEnum(), TestOneof2.NestedEnum.BAR);
+    }
+
+    // Message
+    {
+      TestOneof2.Builder builder = TestOneof2.newBuilder();
+      TestOneof2 message = builder.setFooMessage(
+          TestOneof2.NestedMessage.newBuilder().setQuxInt(234).build()).build();
+      TestOneof2 message2 = TestOneof2.newBuilder().mergeFrom(message).build();
+      assertTrue(message2.hasFooMessage());
+      assertEquals(message2.getFooMessage().getQuxInt(), 234);
+    }
+  }
+
+  public void testOneofSerialization() throws Exception {
+    // Primitive Type
+    {
+      TestOneof2.Builder builder = TestOneof2.newBuilder();
+      TestOneof2 message = builder.setFooInt(123).build();
+      ByteString serialized = message.toByteString();
+      TestOneof2 message2 = TestOneof2.parseFrom(serialized);
+      assertTrue(message2.hasFooInt());
+      assertEquals(message2.getFooInt(), 123);
+    }
+
+    // String
+    {
+      TestOneof2.Builder builder = TestOneof2.newBuilder();
+      TestOneof2 message = builder.setFooString("foo").build();
+      ByteString serialized = message.toByteString();
+      TestOneof2 message2 = TestOneof2.parseFrom(serialized);
+      assertTrue(message2.hasFooString());
+      assertEquals(message2.getFooString(), "foo");
+    }
+
+    // Enum
+    {
+      TestOneof2.Builder builder = TestOneof2.newBuilder();
+      TestOneof2 message = builder.setFooEnum(TestOneof2.NestedEnum.BAR).build();
+      ByteString serialized = message.toByteString();
+      TestOneof2 message2 = TestOneof2.parseFrom(serialized);
+      assertTrue(message2.hasFooEnum());
+      assertEquals(message2.getFooEnum(), TestOneof2.NestedEnum.BAR);
+    }
+
+    // Message
+    {
+      TestOneof2.Builder builder = TestOneof2.newBuilder();
+      TestOneof2 message = builder.setFooMessage(
+          TestOneof2.NestedMessage.newBuilder().setQuxInt(234).build()).build();
+      ByteString serialized = message.toByteString();
+      TestOneof2 message2 = TestOneof2.parseFrom(serialized);
+      assertTrue(message2.hasFooMessage());
+      assertEquals(message2.getFooMessage().getQuxInt(), 234);
+    }
+  }
+
+  public void testOneofNestedBuilderOnChangePropagation() {
+    NestedTestAllTypes.Builder parentBuilder = NestedTestAllTypes.newBuilder();
+    TestAllTypes.Builder builder = parentBuilder.getPayloadBuilder();
+    builder.getOneofNestedMessageBuilder();
+    assertTrue(builder.hasOneofNestedMessage());
+    assertTrue(parentBuilder.hasPayload());
+    NestedTestAllTypes message = parentBuilder.build();
+    assertTrue(message.hasPayload());
+    assertTrue(message.getPayload().hasOneofNestedMessage());
+  }
+
+  public void testGetRepeatedFieldBuilder() {
+    Descriptor descriptor = TestAllTypes.getDescriptor();
+
+    FieldDescriptor fieldDescriptor =
+        descriptor.findFieldByName("repeated_nested_message");
+    FieldDescriptor foreignFieldDescriptor =
+        descriptor.findFieldByName("repeated_foreign_message");
+    FieldDescriptor importFieldDescriptor =
+        descriptor.findFieldByName("repeated_import_message");
+
+    // Mutate the message with new field builder
+    // Mutate nested message
+    TestAllTypes.Builder builder1 = TestAllTypes.newBuilder();
+    Message.Builder fieldBuilder1 = builder1.newBuilderForField(
+        fieldDescriptor);
+    FieldDescriptor subFieldDescriptor1 =
+        fieldBuilder1.getDescriptorForType().findFieldByName("bb");
+    fieldBuilder1.setField(subFieldDescriptor1, 1);
+    builder1.addRepeatedField(fieldDescriptor, fieldBuilder1.build());
+
+    // Mutate foreign message
+    Message.Builder foreignFieldBuilder1 = builder1.newBuilderForField(
+        foreignFieldDescriptor);
+    FieldDescriptor subForeignFieldDescriptor1 =
+        foreignFieldBuilder1.getDescriptorForType().findFieldByName("c");
+    foreignFieldBuilder1.setField(subForeignFieldDescriptor1, 2);
+    builder1.addRepeatedField(foreignFieldDescriptor,
+        foreignFieldBuilder1.build());
+
+    // Mutate import message
+    Message.Builder importFieldBuilder1 = builder1.newBuilderForField(
+        importFieldDescriptor);
+    FieldDescriptor subImportFieldDescriptor1 =
+        importFieldBuilder1.getDescriptorForType().findFieldByName("d");
+    importFieldBuilder1.setField(subImportFieldDescriptor1, 3);
+    builder1.addRepeatedField(importFieldDescriptor,
+        importFieldBuilder1.build());
+
+    Message newMessage1 = builder1.build();
+
+    // Mutate the message with existing field builder
+    // Mutate nested message
+    TestAllTypes.Builder builder2 = TestAllTypes.newBuilder();
+    builder2.addRepeatedNestedMessageBuilder();
+    Message.Builder fieldBuilder2 = builder2.getRepeatedFieldBuilder(
+        fieldDescriptor, 0);
+    FieldDescriptor subFieldDescriptor2 =
+        fieldBuilder2.getDescriptorForType().findFieldByName("bb");
+    fieldBuilder2.setField(subFieldDescriptor2, 1);
+
+    // Mutate foreign message
+    Message.Builder foreignFieldBuilder2 = builder2.newBuilderForField(
+        foreignFieldDescriptor);
+    FieldDescriptor subForeignFieldDescriptor2 =
+        foreignFieldBuilder2.getDescriptorForType().findFieldByName("c");
+    foreignFieldBuilder2.setField(subForeignFieldDescriptor2, 2);
+    builder2.addRepeatedField(foreignFieldDescriptor,
+        foreignFieldBuilder2.build());
+
+    // Mutate import message
+    Message.Builder importFieldBuilder2 = builder2.newBuilderForField(
+        importFieldDescriptor);
+    FieldDescriptor subImportFieldDescriptor2 =
+        importFieldBuilder2.getDescriptorForType().findFieldByName("d");
+    importFieldBuilder2.setField(subImportFieldDescriptor2, 3);
+    builder2.addRepeatedField(importFieldDescriptor,
+        importFieldBuilder2.build());
+
+    Message newMessage2 = builder2.build();
+
+    // These two messages should be equal.
+    assertEquals(newMessage1, newMessage2);
+  }
+
+  public void testGetRepeatedFieldBuilderWithInitializedValue() {
+    Descriptor descriptor = TestAllTypes.getDescriptor();
+    FieldDescriptor fieldDescriptor =
+        descriptor.findFieldByName("repeated_nested_message");
+
+    // Before setting field, builder is initialized by default value. 
+    TestAllTypes.Builder builder = TestAllTypes.newBuilder();
+    builder.addRepeatedNestedMessageBuilder();
+    NestedMessage.Builder fieldBuilder =
+        (NestedMessage.Builder) builder.getRepeatedFieldBuilder(fieldDescriptor, 0);
+    assertEquals(0, fieldBuilder.getBb());
+
+    // Setting field value with new field builder instance.
+    builder = TestAllTypes.newBuilder();
+    NestedMessage.Builder newFieldBuilder =
+        builder.addRepeatedNestedMessageBuilder();
+    newFieldBuilder.setBb(2);
+    // Then get the field builder instance by getRepeatedFieldBuilder().
+    fieldBuilder =
+        (NestedMessage.Builder) builder.getRepeatedFieldBuilder(fieldDescriptor, 0);
+    // It should contain new value.
+    assertEquals(2, fieldBuilder.getBb());
+    // These two builder should be equal.
+    assertSame(fieldBuilder, newFieldBuilder);
+  }
+
+  public void testGetRepeatedFieldBuilderNotSupportedException() {
+    Descriptor descriptor = TestAllTypes.getDescriptor();
+    TestAllTypes.Builder builder = TestAllTypes.newBuilder();
+    try {
+      builder.getRepeatedFieldBuilder(descriptor.findFieldByName("repeated_int32"), 0);
+      fail("Exception was not thrown");
+    } catch (UnsupportedOperationException e) {
+      // We expect this exception.
+    }
+    try {
+      builder.getRepeatedFieldBuilder(
+          descriptor.findFieldByName("repeated_nested_enum"), 0);
+      fail("Exception was not thrown");
+    } catch (UnsupportedOperationException e) {
+      // We expect this exception.
+    }
+    try {
+      builder.getRepeatedFieldBuilder(descriptor.findFieldByName("optional_int32"), 0);
+      fail("Exception was not thrown");
+    } catch (UnsupportedOperationException e) {
+      // We expect this exception.
+    }
+    try {
+      builder.getRepeatedFieldBuilder(
+          descriptor.findFieldByName("optional_nested_enum"), 0);
+      fail("Exception was not thrown");
+    } catch (UnsupportedOperationException e) {
+      // We expect this exception.
+    }
+    try {
+      builder.getRepeatedFieldBuilder(
+          descriptor.findFieldByName("optional_nested_message"), 0);
       fail("Exception was not thrown");
     } catch (UnsupportedOperationException e) {
       // We expect this exception.

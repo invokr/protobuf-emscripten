@@ -1,6 +1,6 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// http://code.google.com/p/protobuf/
+// https://developers.google.com/protocol-buffers/
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -144,5 +144,18 @@ public class LiteTest extends TestCase {
         actual.getRepeatedString(0));
     assertEquals(expected.getOptionalNestedMessage().getBb(),
         actual.getOptionalNestedMessage().getBb());
+  }
+  
+  public void testClone() {
+    TestAllTypesLite.Builder expected = TestAllTypesLite.newBuilder()
+        .setOptionalInt32(123);
+   assertEquals(
+       expected.getOptionalInt32(), expected.clone().getOptionalInt32());
+   
+   TestAllExtensionsLite.Builder expected2 = TestAllExtensionsLite.newBuilder()
+       .setExtension(UnittestLite.optionalInt32ExtensionLite, 123);
+   assertEquals(
+       expected2.getExtension(UnittestLite.optionalInt32ExtensionLite),
+       expected2.clone().getExtension(UnittestLite.optionalInt32ExtensionLite));
   }
 }

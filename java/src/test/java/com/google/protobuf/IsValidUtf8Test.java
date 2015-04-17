@@ -1,6 +1,6 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// http://code.google.com/p/protobuf/
+// https://developers.google.com/protocol-buffers/
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -72,8 +72,11 @@ public class IsValidUtf8Test extends TestCase {
    * Tests that round tripping of all three byte permutations work.
    */
   public void testIsValidUtf8_3Bytes() throws UnsupportedEncodingException {
-    IsValidUtf8TestUtil.testBytes(3,
-        IsValidUtf8TestUtil.EXPECTED_THREE_BYTE_ROUNDTRIPPABLE_COUNT);
+    // Travis' OOM killer doesn't like this test
+    if (System.getenv("TRAVIS") == null) {
+      IsValidUtf8TestUtil.testBytes(3,
+          IsValidUtf8TestUtil.EXPECTED_THREE_BYTE_ROUNDTRIPPABLE_COUNT);
+    }
   }
 
   /**

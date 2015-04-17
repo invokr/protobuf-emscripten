@@ -1,6 +1,6 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// http://code.google.com/p/protobuf/
+// https://developers.google.com/protocol-buffers/
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -34,8 +34,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.UnsupportedCharsetException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
@@ -57,7 +60,7 @@ import java.util.NoSuchElementException;
  * @author carlanton@google.com Carl Haverl
  * @author martinrb@google.com Martin Buchholz
  */
-public abstract class ByteString implements Iterable<Byte> {
+public abstract class ByteString implements Iterable<Byte>, Serializable {
 
   /**
    * When two strings to be concatenated have a combined length shorter than
@@ -177,6 +180,20 @@ public abstract class ByteString implements Iterable<Byte> {
            substring(0, prefix.size()).equals(prefix);
   }
 
+  /**
+   * Tests if this bytestring ends with the specified suffix.
+   * Similar to {@link String#endsWith(String)}
+   *
+   * @param suffix the suffix.
+   * @return <code>true</code> if the byte sequence represented by the
+   *         argument is a suffix of the byte sequence represented by
+   *         this string; <code>false</code> otherwise.
+   */
+  public boolean endsWith(ByteString suffix) {
+    return size() >= suffix.size() &&
+        substring(size() - suffix.size()).equals(suffix);
+  }
+
   // =================================================================
   // byte[] -> ByteString
 
@@ -244,6 +261,18 @@ public abstract class ByteString implements Iterable<Byte> {
   }
 
   /**
+   * Encodes {@code text} into a sequence of bytes using the named charset
+   * and returns the result as a {@code ByteString}.
+   *
+   * @param text source string
+   * @param charset encode using this charset
+   * @return new {@code ByteString}
+   */
+  public static ByteString copyFrom(String text, Charset charset) {
+    return new LiteralByteString(text.getBytes(charset));
+  }
+
+  /**
    * Encodes {@code text} into a sequence of UTF-8 bytes and returns the
    * result as a {@code ByteString}.
    *
@@ -251,11 +280,7 @@ public abstract class ByteString implements Iterable<Byte> {
    * @return new {@code ByteString}
    */
   public static ByteString copyFromUtf8(String text) {
-    try {
-      return new LiteralByteString(text.getBytes("UTF-8"));
-    } catch (UnsupportedEncodingException e) {
-      throw new RuntimeException("UTF-8 not supported?", e);
-    }
+    return new LiteralByteString(text.getBytes(Internal.UTF_8));
   }
 
   // =================================================================
@@ -488,9 +513,9 @@ public abstract class ByteString implements Iterable<Byte> {
 
   /**
    * Internal (package private) implementation of
-   * @link{#copyTo(byte[],int,int,int}.
-   * It assumes that all error checking has already been performed and that 
-   * @code{numberToCopy > 0}.
+   * {@link #copyTo(byte[],int,int,int)}.
+   * It assumes that all error checking has already been performed and that
+   * {@code numberToCopy > 0}.
    */
   protected abstract void copyToInternal(byte[] target, int sourceOffset,
       int targetOffset, int numberToCopy);
@@ -512,6 +537,9 @@ public abstract class ByteString implements Iterable<Byte> {
    */
   public byte[] toByteArray() {
     int size = size();
+    if (size == 0) {
+      return Internal.EMPTY_BYTE_ARRAY;
+    }
     byte[] result = new byte[size];
     copyToInternal(result, 0, 0, size);
     return result;
@@ -525,6 +553,41 @@ public abstract class ByteString implements Iterable<Byte> {
    * @throws IOException  if an I/O error occurs.
    */
   public abstract void writeTo(OutputStream out) throws IOException;
+
+  /**
+   * Writes a specified part of this byte string to an output stream.
+   *
+   * @param  out  the output stream to which to write the data.
+   * @param  sourceOffset offset within these bytes
+   * @param  numberToWrite number of bytes to write
+   * @throws IOException  if an I/O error occurs.
+   * @throws IndexOutOfBoundsException if an offset or size is negative or too
+   *     large
+   */
+  void writeTo(OutputStream out, int sourceOffset, int numberToWrite)
+      throws IOException {
+    if (sourceOffset < 0) {
+      throw new IndexOutOfBoundsException("Source offset < 0: " + sourceOffset);
+    }
+    if (numberToWrite < 0) {
+      throw new IndexOutOfBoundsException("Length < 0: " + numberToWrite);
+    }
+    if (sourceOffset + numberToWrite > size()) {
+      throw new IndexOutOfBoundsException(
+          "Source end offset exceeded: " + (sourceOffset + numberToWrite));
+    }
+    if (numberToWrite > 0) {
+      writeToInternal(out, sourceOffset, numberToWrite);
+    }
+
+  }
+
+  /**
+   * Internal version of {@link #writeTo(OutputStream,int,int)} that assumes
+   * all error checking has already been done.
+   */
+  abstract void writeToInternal(OutputStream out, int sourceOffset,
+      int numberToWrite) throws IOException;
 
   /**
    * Constructs a read-only {@code java.nio.ByteBuffer} whose content
@@ -543,7 +606,7 @@ public abstract class ByteString implements Iterable<Byte> {
    * <p>
    * By returning a list, implementations of this method may be able to avoid
    * copying even when there are multiple backing arrays.
-   * 
+   *
    * @return a list of wrapped bytes
    */
   public abstract List<ByteBuffer> asReadOnlyByteBufferList();
@@ -556,8 +619,36 @@ public abstract class ByteString implements Iterable<Byte> {
    * @return new string
    * @throws UnsupportedEncodingException if charset isn't recognized
    */
-  public abstract String toString(String charsetName)
-      throws UnsupportedEncodingException;
+  public String toString(String charsetName)
+      throws UnsupportedEncodingException {
+    try {
+      return toString(Charset.forName(charsetName));
+    } catch (UnsupportedCharsetException e) {
+      UnsupportedEncodingException exception = new UnsupportedEncodingException(charsetName);
+      exception.initCause(e);
+      throw exception;
+    }
+  }
+
+  /**
+   * Constructs a new {@code String} by decoding the bytes using the
+   * specified charset. Returns the same empty String if empty.
+   *
+   * @param charset encode using this charset
+   * @return new string
+   */
+  public String toString(Charset charset) {
+    return size() == 0 ? "" : toStringInternal(charset);
+  }
+
+  /**
+   * Constructs a new {@code String} by decoding the bytes using the
+   * specified charset.
+   *
+   * @param charset encode using this charset
+   * @return new string
+   */
+  protected abstract String toStringInternal(Charset charset);
 
   // =================================================================
   // UTF-8 decoding
@@ -568,11 +659,7 @@ public abstract class ByteString implements Iterable<Byte> {
    * @return new string using UTF-8 encoding
    */
   public String toStringUtf8() {
-    try {
-      return toString("UTF-8");
-    } catch (UnsupportedEncodingException e) {
-      throw new RuntimeException("UTF-8 not supported?", e);
-    }
+    return toString(Internal.UTF_8);
   }
 
   /**
@@ -647,7 +734,7 @@ public abstract class ByteString implements Iterable<Byte> {
    * The {@link InputStream} returned by this method is guaranteed to be
    * completely non-blocking.  The method {@link InputStream#available()}
    * returns the number of bytes remaining in the stream. The methods
-   * {@link InputStream#read(byte[]), {@link InputStream#read(byte[],int,int)}
+   * {@link InputStream#read(byte[])}, {@link InputStream#read(byte[],int,int)}
    * and {@link InputStream#skip(long)} will read/skip as many bytes as are
    * available.
    * <p>
@@ -775,7 +862,7 @@ public abstract class ByteString implements Iterable<Byte> {
       flushLastBuffer();
       return ByteString.copyFrom(flushedBuffers);
     }
-    
+
     /**
      * Implement java.util.Arrays.copyOf() for jdk 1.5.
      */

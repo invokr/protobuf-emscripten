@@ -1,6 +1,6 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// http://code.google.com/p/protobuf/
+// https://developers.google.com/protocol-buffers/
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -52,6 +52,7 @@ public interface Message extends MessageLite, MessageOrBuilder {
 
   // (From MessageLite, re-declared here only for return type covariance.)
   Parser<? extends Message> getParserForType();
+
 
   // -----------------------------------------------------------------
   // Comparison and hashing
@@ -162,9 +163,28 @@ public interface Message extends MessageLite, MessageOrBuilder {
      * field builder, which will then be nested into its parent builder.
      * <p>
      * NOTE: implementations that do not support nested builders will throw
-     * <code>UnsupportedException</code>.
+     * <code>UnsupportedOperationException</code>.
      */
     Builder getFieldBuilder(Descriptors.FieldDescriptor field);
+
+    /**
+     * Get a nested builder instance for the given repeated field instance.
+     * <p>
+     * Normally, we hold a reference to the immutable message object for the
+     * message type field. Some implementations(the generated message builders),
+     * however, can also hold a reference to the builder object (a nested
+     * builder) for the field.
+     * <p>
+     * If the field is already backed up by a nested builder, the nested builder
+     * will be returned. Otherwise, a new field builder will be created and
+     * returned. The original message field (if exist) will be merged into the
+     * field builder, which will then be nested into its parent builder.
+     * <p>
+     * NOTE: implementations that do not support nested builders will throw
+     * <code>UnsupportedOperationException</code>.
+     */
+    Builder getRepeatedFieldBuilder(Descriptors.FieldDescriptor field,
+                                    int index);
 
     /**
      * Sets a field to the given value.  The value must be of the correct type
@@ -178,6 +198,12 @@ public interface Message extends MessageLite, MessageOrBuilder {
      * "clear" accessor method corresponding to the field.
      */
     Builder clearField(Descriptors.FieldDescriptor field);
+
+    /**
+     * Clears the oneof.  This is exactly equivalent to calling the generated
+     * "clear" accessor method corresponding to the oneof.
+     */
+    Builder clearOneof(Descriptors.OneofDescriptor oneof);
 
     /**
      * Sets an element of a repeated field to the given value.  The value must

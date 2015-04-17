@@ -2,7 +2,7 @@
 #
 # Protocol Buffers - Google's data interchange format
 # Copyright 2008 Google Inc.  All rights reserved.
-# http://code.google.com/p/protobuf/
+# https://developers.google.com/protocol-buffers/
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are
@@ -35,6 +35,7 @@
 __author__ = 'petar@google.com (Petar Petrov)'
 
 import unittest
+
 from google.protobuf import unittest_pb2
 from google.protobuf import service_reflection
 from google.protobuf import service
@@ -118,7 +119,7 @@ class FooUnitTest(unittest.TestCase):
     rpc_controller = 'controller'
     request = 'request'
 
-    # GetDescriptor now static, still works as instance method for compatability
+    # GetDescriptor now static, still works as instance method for compatibility
     self.assertEqual(unittest_pb2.TestService_Stub.GetDescriptor(),
                      stub.GetDescriptor())
 

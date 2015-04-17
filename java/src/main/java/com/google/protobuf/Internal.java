@@ -1,6 +1,6 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// http://code.google.com/p/protobuf/
+// https://developers.google.com/protocol-buffers/
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -30,7 +30,16 @@
 
 package com.google.protobuf;
 
-import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
+import java.util.AbstractList;
+import java.util.AbstractMap;
+import java.util.AbstractSet;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * The classes contained within are used internally by the Protocol Buffer
@@ -41,6 +50,10 @@ import java.io.UnsupportedEncodingException;
  * @author kenton@google.com (Kenton Varda)
  */
 public class Internal {
+
+  protected static final Charset UTF_8 = Charset.forName("UTF-8");
+  protected static final Charset ISO_8859_1 = Charset.forName("ISO-8859-1");
+
   /**
    * Helper called by generated code to construct default values for string
    * fields.
@@ -70,14 +83,7 @@ public class Internal {
    * generated code calls this automatically.
    */
   public static String stringDefaultValue(String bytes) {
-    try {
-      return new String(bytes.getBytes("ISO-8859-1"), "UTF-8");
-    } catch (UnsupportedEncodingException e) {
-      // This should never happen since all JVMs are required to implement
-      // both of the above character sets.
-      throw new IllegalStateException(
-          "Java VM does not support a standard character set.", e);
-    }
+    return new String(bytes.getBytes(ISO_8859_1), UTF_8);
   }
 
   /**
@@ -89,14 +95,45 @@ public class Internal {
    * embed raw bytes as a string literal with ISO-8859-1 encoding.
    */
   public static ByteString bytesDefaultValue(String bytes) {
-    try {
-      return ByteString.copyFrom(bytes.getBytes("ISO-8859-1"));
-    } catch (UnsupportedEncodingException e) {
-      // This should never happen since all JVMs are required to implement
-      // ISO-8859-1.
-      throw new IllegalStateException(
-          "Java VM does not support a standard character set.", e);
-    }
+    return ByteString.copyFrom(bytes.getBytes(ISO_8859_1));
+  }
+  /**
+   * Helper called by generated code to construct default values for bytes
+   * fields.
+   * <p>
+   * This is like {@link #bytesDefaultValue}, but returns a byte array.
+   */
+  public static byte[] byteArrayDefaultValue(String bytes) {
+    return bytes.getBytes(ISO_8859_1);
+  }
+
+  /**
+   * Helper called by generated code to construct default values for bytes
+   * fields.
+   * <p>
+   * This is like {@link #bytesDefaultValue}, but returns a ByteBuffer.
+   */
+  public static ByteBuffer byteBufferDefaultValue(String bytes) {
+    return ByteBuffer.wrap(byteArrayDefaultValue(bytes));
+  }
+
+  /**
+   * Create a new ByteBuffer and copy all the content of {@code source}
+   * ByteBuffer to the new ByteBuffer. The new ByteBuffer's limit and
+   * capacity will be source.capacity(), and its position will be 0.
+   * Note that the state of {@code source} ByteBuffer won't be changed.
+   */
+  public static ByteBuffer copyByteBuffer(ByteBuffer source) {
+    // Make a duplicate of the source ByteBuffer and read data from the
+    // duplicate. This is to avoid affecting the source ByteBuffer's state.
+    ByteBuffer temp = source.duplicate();
+    // We want to copy all the data in the source ByteBuffer, not just the
+    // remaining bytes.
+    temp.clear();
+    ByteBuffer result = ByteBuffer.allocate(temp.capacity());
+    result.put(temp);
+    result.clear();
+    return result;
   }
 
   /**
@@ -132,6 +169,27 @@ public class Internal {
   }
 
   /**
+   * Like {@link #isValidUtf8(ByteString)} but for byte arrays.
+   */
+  public static boolean isValidUtf8(byte[] byteArray) {
+    return Utf8.isValidUtf8(byteArray);
+  }
+
+  /**
+   * Helper method to get the UTF-8 bytes of a string.
+   */
+  public static byte[] toByteArray(String value) {
+    return value.getBytes(UTF_8);
+  }
+
+  /**
+   * Helper method to convert a byte array to a string using UTF-8 encoding.
+   */
+  public static String toStringUtf8(byte[] bytes) {
+    return new String(bytes, UTF_8);
+  }
+
+  /**
    * Interface for an enum value or value descriptor, to be used in FieldSet.
    * The lite library stores enum values directly in FieldSets but the full
    * library stores EnumValueDescriptors in order to better support reflection.
@@ -149,5 +207,329 @@ public class Internal {
    */
   public interface EnumLiteMap<T extends EnumLite> {
     T findValueByNumber(int number);
+  }
+
+  /**
+   * Helper method for implementing {@link Message#hashCode()} for longs.
+   * @see Long#hashCode()
+   */
+  public static int hashLong(long n) {
+    return (int) (n ^ (n >>> 32));
+  }
+
+  /**
+   * Helper method for implementing {@link Message#hashCode()} for
+   * booleans.
+   * @see Boolean#hashCode()
+   */
+  public static int hashBoolean(boolean b) {
+    return b ? 1231 : 1237;
+  }
+
+  /**
+   * Helper method for implementing {@link Message#hashCode()} for enums.
+   * <p>
+   * This is needed because {@link java.lang.Enum#hashCode()} is final, but we
+   * need to use the field number as the hash code to ensure compatibility
+   * between statically and dynamically generated enum objects.
+   */
+  public static int hashEnum(EnumLite e) {
+    return e.getNumber();
+  }
+
+  /**
+   * Helper method for implementing {@link Message#hashCode()} for
+   * enum lists.
+   */
+  public static int hashEnumList(List<? extends EnumLite> list) {
+    int hash = 1;
+    for (EnumLite e : list) {
+      hash = 31 * hash + hashEnum(e);
+    }
+    return hash;
+  }
+
+  /**
+   * Helper method for implementing {@link Message#equals(Object)} for bytes field.
+   */
+  public static boolean equals(List<byte[]> a, List<byte[]> b) {
+    if (a.size() != b.size()) return false;
+    for (int i = 0; i < a.size(); ++i) {
+      if (!Arrays.equals(a.get(i), b.get(i))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Helper method for implementing {@link Message#hashCode()} for bytes field.
+   */
+  public static int hashCode(List<byte[]> list) {
+    int hash = 1;
+    for (byte[] bytes : list) {
+      hash = 31 * hash + hashCode(bytes);
+    }
+    return hash;
+  }
+
+  /**
+   * Helper method for implementing {@link Message#hashCode()} for bytes field.
+   */
+  public static int hashCode(byte[] bytes) {
+    // The hash code for a byte array should be the same as the hash code for a
+    // ByteString with the same content. This is to ensure that the generated
+    // hashCode() method will return the same value as the pure reflection
+    // based hashCode() method.
+    return LiteralByteString.hashCode(bytes);
+  }
+
+  /**
+   * Helper method for implementing {@link Message#equals(Object)} for bytes
+   * field.
+   */
+  public static boolean equalsByteBuffer(ByteBuffer a, ByteBuffer b) {
+    if (a.capacity() != b.capacity()) {
+      return false;
+    }
+    // ByteBuffer.equals() will only compare the remaining bytes, but we want to
+    // compare all the content.
+    return a.duplicate().clear().equals(b.duplicate().clear());
+  }
+
+  /**
+   * Helper method for implementing {@link Message#equals(Object)} for bytes
+   * field.
+   */
+  public static boolean equalsByteBuffer(
+      List<ByteBuffer> a, List<ByteBuffer> b) {
+    if (a.size() != b.size()) {
+      return false;
+    }
+    for (int i = 0; i < a.size(); ++i) {
+      if (!equalsByteBuffer(a.get(i), b.get(i))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Helper method for implementing {@link Message#hashCode()} for bytes
+   * field.
+   */
+  public static int hashCodeByteBuffer(List<ByteBuffer> list) {
+    int hash = 1;
+    for (ByteBuffer bytes : list) {
+      hash = 31 * hash + hashCodeByteBuffer(bytes);
+    }
+    return hash;
+  }
+
+  private static final int DEFAULT_BUFFER_SIZE = 4096;
+
+  /**
+   * Helper method for implementing {@link Message#hashCode()} for bytes
+   * field.
+   */
+  public static int hashCodeByteBuffer(ByteBuffer bytes) {
+    if (bytes.hasArray()) {
+      // Fast path.
+      int h = LiteralByteString.hashCode(bytes.capacity(), bytes.array(),
+          bytes.arrayOffset(), bytes.capacity());
+      return h == 0 ? 1 : h;
+    } else {
+      // Read the data into a temporary byte array before calculating the
+      // hash value.
+      final int bufferSize = bytes.capacity() > DEFAULT_BUFFER_SIZE
+          ? DEFAULT_BUFFER_SIZE : bytes.capacity();
+      final byte[] buffer = new byte[bufferSize];
+      final ByteBuffer duplicated = bytes.duplicate();
+      duplicated.clear();
+      int h = bytes.capacity();
+      while (duplicated.remaining() > 0) {
+        final int length = duplicated.remaining() <= bufferSize ?
+            duplicated.remaining() : bufferSize;
+        duplicated.get(buffer, 0, length);
+        h = LiteralByteString.hashCode(h, buffer, 0, length);
+      }
+      return h == 0 ? 1 : h;
+    }
+  }
+
+  /**
+   * An empty byte array constant used in generated code.
+   */
+  public static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
+
+  /**
+   * An empty byte array constant used in generated code.
+   */
+  public static final ByteBuffer EMPTY_BYTE_BUFFER =
+      ByteBuffer.wrap(EMPTY_BYTE_ARRAY);
+
+  /** An empty coded input stream constant used in generated code. */
+  public static final CodedInputStream EMPTY_CODED_INPUT_STREAM =
+      CodedInputStream.newInstance(EMPTY_BYTE_ARRAY);
+
+
+  /**
+   * Provides an immutable view of List<T> around a List<F>.
+   *
+   * Protobuf internal. Used in protobuf generated code only.
+   */
+  public static class ListAdapter<F, T> extends AbstractList<T> {
+    /**
+     * Convert individual elements of the List from F to T.
+     */
+    public interface Converter<F, T> {
+      T convert(F from);
+    }
+
+    private final List<F> fromList;
+    private final Converter<F, T> converter;
+
+    public ListAdapter(List<F> fromList, Converter<F, T> converter) {
+      this.fromList = fromList;
+      this.converter = converter;
+    }
+
+    @Override
+    public T get(int index) {
+      return converter.convert(fromList.get(index));
+    }
+
+    @Override
+    public int size() {
+      return fromList.size();
+    }
+  }
+
+  /**
+   * Wrap around a Map<K, RealValue> and provide a Map<K, V> interface.
+   */
+  public static class MapAdapter<K, V, RealValue> extends AbstractMap<K, V> {
+    /**
+     * An interface used to convert between two types.
+     */
+    public interface Converter<A, B> {
+      B doForward(A object);
+      A doBackward(B object);
+    }
+
+    public static <T extends EnumLite> Converter<Integer, T> newEnumConverter(
+        final EnumLiteMap<T> enumMap, final T unrecognizedValue) {
+      return new Converter<Integer, T>() {
+        public T doForward(Integer value) {
+          T result = enumMap.findValueByNumber(value);
+          return result == null ? unrecognizedValue : result;
+        }
+        public Integer doBackward(T value) {
+          return value.getNumber();
+        }
+      };
+    }
+
+    private final Map<K, RealValue> realMap;
+    private final Converter<RealValue, V> valueConverter;
+
+    public MapAdapter(Map<K, RealValue> realMap,
+        Converter<RealValue, V> valueConverter) {
+      this.realMap = realMap;
+      this.valueConverter = valueConverter;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public V get(Object key) {
+      RealValue result = realMap.get(key);
+      if (result == null) {
+        return null;
+      }
+      return valueConverter.doForward(result);
+    }
+
+    @Override
+    public V put(K key, V value) {
+      RealValue oldValue = realMap.put(key, valueConverter.doBackward(value));
+      if (oldValue == null) {
+        return null;
+      }
+      return valueConverter.doForward(oldValue);
+    }
+
+    @Override
+    public Set<java.util.Map.Entry<K, V>> entrySet() {
+      return new SetAdapter(realMap.entrySet());
+    }
+
+    private class SetAdapter extends AbstractSet<Map.Entry<K, V>> {
+      private final Set<Map.Entry<K, RealValue>> realSet;
+      public SetAdapter(Set<Map.Entry<K, RealValue>> realSet) {
+        this.realSet = realSet;
+      }
+
+      @Override
+      public Iterator<java.util.Map.Entry<K, V>> iterator() {
+        return new IteratorAdapter(realSet.iterator());
+      }
+
+      @Override
+      public int size() {
+        return realSet.size();
+      }
+    }
+
+    private class IteratorAdapter implements Iterator<Map.Entry<K, V>> {
+      private final Iterator<Map.Entry<K, RealValue>> realIterator;
+
+      public IteratorAdapter(
+          Iterator<Map.Entry<K, RealValue>> realIterator) {
+        this.realIterator = realIterator;
+      }
+
+      @Override
+      public boolean hasNext() {
+        return realIterator.hasNext();
+      }
+
+      @Override
+      public java.util.Map.Entry<K, V> next() {
+        return new EntryAdapter(realIterator.next());
+      }
+
+      @Override
+      public void remove() {
+        realIterator.remove();
+      }
+    }
+
+    private class EntryAdapter implements Map.Entry<K, V> {
+      private final Map.Entry<K, RealValue> realEntry;
+
+      public EntryAdapter(Map.Entry<K, RealValue> realEntry) {
+        this.realEntry = realEntry;
+      }
+
+      @Override
+      public K getKey() {
+        return realEntry.getKey();
+      }
+
+      @Override
+      public V getValue() {
+        return valueConverter.doForward(realEntry.getValue());
+      }
+
+      @Override
+      public V setValue(V value) {
+        RealValue oldValue = realEntry.setValue(
+            valueConverter.doBackward(value));
+        if (oldValue == null) {
+          return null;
+        }
+        return valueConverter.doForward(oldValue);
+      }
+    }
   }
 }
