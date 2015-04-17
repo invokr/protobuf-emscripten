@@ -1,4 +1,9 @@
 # Files regenrated by make
+.libs
+.dirstamp
+*.o
+*.lo
+*.la
 Makefile
 config.h
 config.log
@@ -30,6 +35,7 @@ src/google/protobuf/compiler/ruby/.deps/
 src/google/protobuf/io/.deps/
 src/google/protobuf/stubs/.deps/
 src/google/protobuf/testing/.deps/
+src/google/protobuf/stubs/pbconfig.h
 stamp-h1
 
 # Files regenrated by autogen
