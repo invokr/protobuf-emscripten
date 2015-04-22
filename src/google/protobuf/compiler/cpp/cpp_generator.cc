@@ -36,9 +36,6 @@
 
 #include <vector>
 #include <memory>
-#ifndef _SHARED_PTR_H
-#include <google/protobuf/stubs/shared_ptr.h>
-#endif
 #include <utility>
 
 #include <google/protobuf/compiler/cpp/cpp_file.h>
@@ -105,7 +102,7 @@ bool CppGenerator::Generate(const FileDescriptor* file,
 
   // Generate header.
   {
-    google::protobuf::scoped_ptr<io::ZeroCopyOutputStream> output(
+    scoped_ptr<io::ZeroCopyOutputStream> output(
         generator_context->Open(basename + ".h"));
     io::Printer printer(output.get(), '$');
     file_generator.GenerateHeader(&printer);
@@ -113,7 +110,7 @@ bool CppGenerator::Generate(const FileDescriptor* file,
 
   // Generate cc file.
   {
-    google::protobuf::scoped_ptr<io::ZeroCopyOutputStream> output(
+    scoped_ptr<io::ZeroCopyOutputStream> output(
         generator_context->Open(basename + ".cc"));
     io::Printer printer(output.get(), '$');
     file_generator.GenerateSource(&printer);

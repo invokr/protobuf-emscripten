@@ -34,10 +34,8 @@
 //
 // This file contains messages for testing message_set_wire_format.
 
-syntax = "proto2";
 package protobuf_unittest;
 
-option cc_enable_arenas = true;
 option optimize_for = SPEED;
 
 // A message with message_set_wire_format.

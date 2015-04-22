@@ -40,10 +40,8 @@
 
 #include <google/protobuf/io/coded_stream_inl.h>
 #include <algorithm>
-#include <utility>
 #include <limits.h>
 #include <google/protobuf/io/zero_copy_stream.h>
-#include <google/protobuf/arena.h>
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/stubs/stl_util.h>
 
@@ -149,19 +147,6 @@ void CodedInputStream::PopLimit(Limit limit) {
   // We may no longer be at a legitimate message end.  ReadTag() needs to be
   // called again to find out.
   legitimate_message_end_ = false;
-}
-
-std::pair<CodedInputStream::Limit, int>
-CodedInputStream::IncrementRecursionDepthAndPushLimit(int byte_limit) {
-  return std::make_pair(PushLimit(byte_limit), --recursion_budget_);
-}
-
-bool CodedInputStream::DecrementRecursionDepthAndPopLimit(Limit limit) {
-  bool result = ConsumedEntireMessage();
-  PopLimit(limit);
-  GOOGLE_DCHECK_LT(recursion_budget_, recursion_limit_);
-  ++recursion_budget_;
-  return result;
 }
 
 int CodedInputStream::BytesUntilLimit() const {
@@ -613,15 +598,8 @@ CodedOutputStream::CodedOutputStream(ZeroCopyOutputStream* output)
 }
 
 CodedOutputStream::~CodedOutputStream() {
-  Trim();
-}
-
-void CodedOutputStream::Trim() {
   if (buffer_size_ > 0) {
     output_->BackUp(buffer_size_);
-    total_bytes_ -= buffer_size_;
-    buffer_size_ = 0;
-    buffer_ = NULL;
   }
 }
 
@@ -669,7 +647,12 @@ void CodedOutputStream::WriteAliasedRaw(const void* data, int size) {
       ) {
     WriteRaw(data, size);
   } else {
-    Trim();
+    if (buffer_size_ > 0) {
+      output_->BackUp(buffer_size_);
+      total_bytes_ -= buffer_size_;
+      buffer_ = NULL;
+      buffer_size_ = 0;
+    }
 
     total_bytes_ += size;
     had_error_ |= !output_->WriteAliasedRaw(data, size);
@@ -706,12 +689,61 @@ void CodedOutputStream::WriteLittleEndian64(uint64 value) {
   }
 }
 
-void CodedOutputStream::WriteVarint32SlowPath(uint32 value) {
-  uint8 bytes[kMaxVarint32Bytes];
-  uint8* target = &bytes[0];
-  uint8* end = WriteVarint32ToArray(value, target);
-  int size = end - target;
-  WriteRaw(bytes, size);
+inline uint8* CodedOutputStream::WriteVarint32FallbackToArrayInline(
+    uint32 value, uint8* target) {
+  target[0] = static_cast<uint8>(value | 0x80);
+  if (value >= (1 << 7)) {
+    target[1] = static_cast<uint8>((value >>  7) | 0x80);
+    if (value >= (1 << 14)) {
+      target[2] = static_cast<uint8>((value >> 14) | 0x80);
+      if (value >= (1 << 21)) {
+        target[3] = static_cast<uint8>((value >> 21) | 0x80);
+        if (value >= (1 << 28)) {
+          target[4] = static_cast<uint8>(value >> 28);
+          return target + 5;
+        } else {
+          target[3] &= 0x7F;
+          return target + 4;
+        }
+      } else {
+        target[2] &= 0x7F;
+        return target + 3;
+      }
+    } else {
+      target[1] &= 0x7F;
+      return target + 2;
+    }
+  } else {
+    target[0] &= 0x7F;
+    return target + 1;
+  }
+}
+
+void CodedOutputStream::WriteVarint32(uint32 value) {
+  if (buffer_size_ >= kMaxVarint32Bytes) {
+    // Fast path:  We have enough bytes left in the buffer to guarantee that
+    // this write won't cross the end, so we can skip the checks.
+    uint8* target = buffer_;
+    uint8* end = WriteVarint32FallbackToArrayInline(value, target);
+    int size = end - target;
+    Advance(size);
+  } else {
+    // Slow path:  This write might cross the end of the buffer, so we
+    // compose the bytes first then use WriteRaw().
+    uint8 bytes[kMaxVarint32Bytes];
+    int size = 0;
+    while (value > 0x7F) {
+      bytes[size++] = (static_cast<uint8>(value) & 0x7F) | 0x80;
+      value >>= 7;
+    }
+    bytes[size++] = static_cast<uint8>(value) & 0x7F;
+    WriteRaw(bytes, size);
+  }
+}
+
+uint8* CodedOutputStream::WriteVarint32FallbackToArray(
+    uint32 value, uint8* target) {
+  return WriteVarint32FallbackToArrayInline(value, target);
 }
 
 inline uint8* CodedOutputStream::WriteVarint64ToArrayInline(

@@ -37,7 +37,6 @@
 #include <algorithm>
 #include <limits>
 
-#include <google/protobuf/stubs/casts.h>
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/stubs/stl_util.h>
 

@@ -30,7 +30,6 @@
 
 // Author: jonp@google.com (Jon Perlow)
 //
-syntax = "proto2";
 
 package protobuf_unittest;
 

@@ -54,7 +54,6 @@
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/stubs/once.h>
-#include <google/protobuf/stubs/stringprintf.h>
 #include <google/protobuf/stubs/strutil.h>
 #include <google/protobuf/stubs/substitute.h>
 #include <google/protobuf/stubs/map_util.h>
@@ -135,19 +134,6 @@ const char * const FieldDescriptor::kLabelToName[MAX_LABEL + 1] = {
   "repeated",  // LABEL_REPEATED
 };
 
-const char* FileDescriptor::SyntaxName(FileDescriptor::Syntax syntax) {
-  switch (syntax) {
-    case SYNTAX_PROTO2:
-      return "proto2";
-    case SYNTAX_PROTO3:
-      return "proto3";
-    case SYNTAX_UNKNOWN:
-      return "unknown";
-  }
-  GOOGLE_LOG(FATAL) << "can't reach here.";
-  return NULL;
-}
-
 static const char * const kNonLinkedWeakMessageReplacementName = "google.protobuf.Empty";
 
 #ifndef _MSC_VER  // MSVC doesn't need these and won't even accept them.
@@ -158,8 +144,8 @@ const int FieldDescriptor::kLastReservedNumber;
 
 namespace {
 
-string ToCamelCase(const string& input, bool lower_first) {
-  bool capitalize_next = !lower_first;
+string ToCamelCase(const string& input) {
+  bool capitalize_next = false;
   string result;
   result.reserve(input.size());
 
@@ -180,8 +166,8 @@ string ToCamelCase(const string& input, bool lower_first) {
   }
 
   // Lower-case the first letter.
-  if (lower_first && !result.empty() && 'A' <= result[0] && result[0] <= 'Z') {
-      result[0] = result[0] - 'A' + 'a';
+  if (!result.empty() && 'A' <= result[0] && result[0] <= 'Z') {
+    result[0] = result[0] - 'A' + 'a';
   }
 
   return result;
@@ -341,36 +327,6 @@ typedef hash_map<EnumIntPair, const EnumValueDescriptor*,
 typedef map<DescriptorIntPair, const FieldDescriptor*>
   ExtensionsGroupedByDescriptorMap;
 typedef hash_map<string, const SourceCodeInfo_Location*> LocationsByPathMap;
-
-set<string>* allowed_proto3_extendees_ = NULL;
-GOOGLE_PROTOBUF_DECLARE_ONCE(allowed_proto3_extendees_init_);
-
-void DeleteAllowedProto3Extendee() {
-  delete allowed_proto3_extendees_;
-}
-
-void InitAllowedProto3Extendee() {
-  allowed_proto3_extendees_ = new set<string>;
-  allowed_proto3_extendees_->insert("google.protobuf.FileOptions");
-  allowed_proto3_extendees_->insert("google.protobuf.MessageOptions");
-  allowed_proto3_extendees_->insert("google.protobuf.FieldOptions");
-  allowed_proto3_extendees_->insert("google.protobuf.EnumOptions");
-  allowed_proto3_extendees_->insert("google.protobuf.EnumValueOptions");
-  allowed_proto3_extendees_->insert("google.protobuf.ServiceOptions");
-  allowed_proto3_extendees_->insert("google.protobuf.MethodOptions");
-  google::protobuf::internal::OnShutdown(&DeleteAllowedProto3Extendee);
-}
-
-// Checks whether the extendee type is allowed in proto3.
-// Only extensions to descriptor options are allowed. We use name comparison
-// instead of comparing the descriptor directly because the extensions may be
-// defined in a different pool.
-bool AllowedExtendeeInProto3(const string& name) {
-  ::google::protobuf::GoogleOnceInit(&allowed_proto3_extendees_init_, &InitAllowedProto3Extendee);
-  return allowed_proto3_extendees_->find(name) !=
-         allowed_proto3_extendees_->end();
-}
-
 }  // anonymous namespace
 
 // ===================================================================
@@ -576,9 +532,6 @@ class FileDescriptorTables {
     const void* parent, const string& camelcase_name) const;
   inline const EnumValueDescriptor* FindEnumValueByNumber(
     const EnumDescriptor* parent, int number) const;
-  // This creates a new EnumValueDescriptor if not found, in a thread-safe way.
-  inline const EnumValueDescriptor* FindEnumValueByNumberCreatingIfUnknown(
-      const EnumDescriptor* parent, int number) const;
 
   // -----------------------------------------------------------------
   // Adding items.
@@ -614,16 +567,10 @@ class FileDescriptorTables {
   FieldsByNameMap       fields_by_camelcase_name_;
   FieldsByNumberMap     fields_by_number_;       // Not including extensions.
   EnumValuesByNumberMap enum_values_by_number_;
-  mutable EnumValuesByNumberMap unknown_enum_values_by_number_
-      GOOGLE_GUARDED_BY(unknown_enum_values_mu_);
 
   // Populated on first request to save space, hence constness games.
   mutable GoogleOnceDynamic locations_by_path_once_;
   mutable LocationsByPathMap locations_by_path_;
-
-  // Mutex to protect the unknown-enum-value map due to dynamic
-  // EnumValueDescriptor creation on unknown values.
-  mutable Mutex unknown_enum_values_mu_;
 };
 
 DescriptorPool::Tables::Tables()
@@ -653,8 +600,7 @@ FileDescriptorTables::FileDescriptorTables()
       fields_by_lowercase_name_(3),
       fields_by_camelcase_name_(3),
       fields_by_number_(3),
-      enum_values_by_number_(3),
-      unknown_enum_values_by_number_(3) {
+      enum_values_by_number_(3) {
 }
 
 FileDescriptorTables::~FileDescriptorTables() {}
@@ -783,7 +729,7 @@ inline const FileDescriptor* DescriptorPool::Tables::FindFile(
 
 inline const FieldDescriptor* FileDescriptorTables::FindFieldByNumber(
     const Descriptor* parent, int number) const {
-  return FindPtrOrNull(fields_by_number_, std::make_pair(parent, number));
+  return FindPtrOrNull(fields_by_number_, make_pair(parent, number));
 }
 
 inline const FieldDescriptor* FileDescriptorTables::FindFieldByLowercaseName(
@@ -800,71 +746,18 @@ inline const FieldDescriptor* FileDescriptorTables::FindFieldByCamelcaseName(
 
 inline const EnumValueDescriptor* FileDescriptorTables::FindEnumValueByNumber(
     const EnumDescriptor* parent, int number) const {
-  return FindPtrOrNull(enum_values_by_number_, std::make_pair(parent, number));
+  return FindPtrOrNull(enum_values_by_number_, make_pair(parent, number));
 }
-
-inline const EnumValueDescriptor*
-FileDescriptorTables::FindEnumValueByNumberCreatingIfUnknown(
-    const EnumDescriptor* parent, int number) const {
-  // First try, with map of compiled-in values.
-  {
-    const EnumValueDescriptor* desc =
-        FindPtrOrNull(enum_values_by_number_, std::make_pair(parent, number));
-    if (desc != NULL) {
-      return desc;
-    }
-  }
-  // Second try, with reader lock held on unknown enum values: common case.
-  {
-    ReaderMutexLock l(&unknown_enum_values_mu_);
-    const EnumValueDescriptor* desc = FindPtrOrNull(
-        unknown_enum_values_by_number_, std::make_pair(parent, number));
-    if (desc != NULL) {
-      return desc;
-    }
-  }
-  // If not found, try again with writer lock held, and create new descriptor if
-  // necessary.
-  {
-    WriterMutexLock l(&unknown_enum_values_mu_);
-    const EnumValueDescriptor* desc = FindPtrOrNull(
-        unknown_enum_values_by_number_, std::make_pair(parent, number));
-    if (desc != NULL) {
-      return desc;
-    }
-
-    // Create an EnumValueDescriptor dynamically. We don't insert it into the
-    // EnumDescriptor (it's not a part of the enum as originally defined), but
-    // we do insert it into the table so that we can return the same pointer
-    // later.
-    string enum_value_name = StringPrintf(
-        "UNKNOWN_ENUM_VALUE_%s_%d", parent->name().c_str(), number);
-    DescriptorPool::Tables* tables =
-        const_cast<DescriptorPool::Tables*>(DescriptorPool::generated_pool()->
-                                            tables_.get());
-    EnumValueDescriptor* result = tables->Allocate<EnumValueDescriptor>();
-    result->name_ = tables->AllocateString(enum_value_name);
-    result->full_name_ = tables->AllocateString(parent->full_name() +
-                                                "." + enum_value_name);
-    result->number_ = number;
-    result->type_ = parent;
-    result->options_ = &EnumValueOptions::default_instance();
-    InsertIfNotPresent(&unknown_enum_values_by_number_,
-                       std::make_pair(parent, number), result);
-    return result;
-  }
-}
-
 
 inline const FieldDescriptor* DescriptorPool::Tables::FindExtension(
     const Descriptor* extendee, int number) {
-  return FindPtrOrNull(extensions_, std::make_pair(extendee, number));
+  return FindPtrOrNull(extensions_, make_pair(extendee, number));
 }
 
 inline void DescriptorPool::Tables::FindAllExtensions(
     const Descriptor* extendee, vector<const FieldDescriptor*>* out) const {
   ExtensionsGroupedByDescriptorMap::const_iterator it =
-      extensions_.lower_bound(std::make_pair(extendee, 0));
+      extensions_.lower_bound(make_pair(extendee, 0));
   for (; it != extensions_.end() && it->first.first == extendee; ++it) {
     out->push_back(it->second);
   }
@@ -992,7 +885,7 @@ void FileDescriptorTables::BuildLocationsByPath(
 const SourceCodeInfo_Location* FileDescriptorTables::GetSourceLocation(
     const vector<int>& path, const SourceCodeInfo* info) const {
   pair<const FileDescriptorTables*, const SourceCodeInfo*> p(
-      std::make_pair(this, info));
+      make_pair(this, info));
   locations_by_path_once_.Init(&FileDescriptorTables::BuildLocationsByPath, &p);
   return FindPtrOrNull(locations_by_path_, Join(path, ","));
 }
@@ -1418,11 +1311,6 @@ EnumDescriptor::FindValueByNumber(int key) const {
   return file()->tables_->FindEnumValueByNumber(this, key);
 }
 
-const EnumValueDescriptor*
-EnumDescriptor::FindValueByNumberCreatingIfUnknown(int key) const {
-  return file()->tables_->FindEnumValueByNumberCreatingIfUnknown(this, key);
-}
-
 const MethodDescriptor*
 ServiceDescriptor::FindMethodByName(const string& key) const {
   Symbol result =
@@ -1623,10 +1511,6 @@ bool DescriptorPool::TryFindExtensionInFallbackDatabase(
 
 // ===================================================================
 
-bool FieldDescriptor::is_map() const {
-  return type() == TYPE_MESSAGE && message_type()->options().map_entry();
-}
-
 string FieldDescriptor::DefaultValueAsString(bool quote_string_type) const {
   GOOGLE_CHECK(has_default_value()) << "No default value";
   switch (cpp_type()) {
@@ -1678,8 +1562,6 @@ string FieldDescriptor::DefaultValueAsString(bool quote_string_type) const {
 void FileDescriptor::CopyTo(FileDescriptorProto* proto) const {
   proto->set_name(name());
   if (!package().empty()) proto->set_package(package());
-  // TODO(liujisi): Also populate when syntax="proto2".
-  if (syntax() == SYNTAX_PROTO3) proto->set_syntax(SyntaxName(syntax()));
 
   for (int i = 0; i < dependency_count(); i++) {
     proto->add_dependency(dependency(i)->name());
@@ -1712,8 +1594,7 @@ void FileDescriptor::CopyTo(FileDescriptorProto* proto) const {
 }
 
 void FileDescriptor::CopySourceCodeInfoTo(FileDescriptorProto* proto) const {
-  if (source_code_info_ &&
-      source_code_info_ != &SourceCodeInfo::default_instance()) {
+  if (source_code_info_ != &SourceCodeInfo::default_instance()) {
     proto->mutable_source_code_info()->CopyFrom(*source_code_info_);
   }
 }
@@ -1849,13 +1730,6 @@ void MethodDescriptor::CopyTo(MethodDescriptorProto* proto) const {
   if (&options() != &MethodOptions::default_instance()) {
     proto->mutable_options()->CopyFrom(options());
   }
-
-  if (client_streaming_) {
-    proto->set_client_streaming(true);
-  }
-  if (server_streaming_) {
-    proto->set_server_streaming(true);
-  }
 }
 
 // DebugString methods ===============================================
@@ -1928,92 +1802,10 @@ bool FormatLineOptions(int depth, const Message &options, string *output) {
   return !all_options.empty();
 }
 
-class SourceLocationCommentPrinter {
- public:
-  template<typename DescType>
-  SourceLocationCommentPrinter(const DescType* desc,
-                               const string& prefix,
-                               const DebugStringOptions& options)
-      : options_(options), prefix_(prefix) {
-    // Perform the SourceLocation lookup only if we're including user comments,
-    // because the lookup is fairly expensive.
-    have_source_loc_ = options.include_comments &&
-        desc->GetSourceLocation(&source_loc_);
-  }
-  SourceLocationCommentPrinter(const FileDescriptor* file,
-                               const vector<int>& path,
-                               const string& prefix,
-                               const DebugStringOptions& options)
-      : options_(options), prefix_(prefix) {
-    // Perform the SourceLocation lookup only if we're including user comments,
-    // because the lookup is fairly expensive.
-    have_source_loc_ = options.include_comments &&
-        file->GetSourceLocation(path, &source_loc_);
-  }
-  void AddPreComment(string* output) {
-    if (have_source_loc_) {
-      // Detached leading comments.
-      for (int i = 0 ; i < source_loc_.leading_detached_comments.size(); ++i) {
-        *output += FormatComment(source_loc_.leading_detached_comments[i]);
-        *output += "\n";
-      }
-      // Attached leading comments.
-      if (!source_loc_.leading_comments.empty()) {
-        *output += FormatComment(source_loc_.leading_comments);
-      }
-    }
-  }
-  void AddPostComment(string* output) {
-    if (have_source_loc_ && source_loc_.trailing_comments.size() > 0) {
-      *output += FormatComment(source_loc_.trailing_comments);
-    }
-  }
-
-  // Format comment such that each line becomes a full-line C++-style comment in
-  // the DebugString() output.
-  string FormatComment(const string& comment_text) {
-    string stripped_comment = comment_text;
-    StripWhitespace(&stripped_comment);
-    vector<string> lines = Split(stripped_comment, "\n");
-    string output;
-    for (int i = 0; i < lines.size(); ++i) {
-      const string& line = lines[i];
-      strings::SubstituteAndAppend(&output, "$0// $1\n", prefix_, line);
-    }
-    return output;
-  }
-
- private:
-  bool have_source_loc_;
-  SourceLocation source_loc_;
-  DebugStringOptions options_;
-  string prefix_;
-};
-
 }  // anonymous namespace
 
 string FileDescriptor::DebugString() const {
-  DebugStringOptions options;  // default options
-  return DebugStringWithOptions(options);
-}
-
-string FileDescriptor::DebugStringWithOptions(
-    const DebugStringOptions& debug_string_options) const {
-  string contents;
-  {
-    vector<int> path;
-    path.push_back(FileDescriptorProto::kSyntaxFieldNumber);
-    SourceLocationCommentPrinter syntax_comment(
-        this, path, "", debug_string_options);
-    syntax_comment.AddPreComment(&contents);
-    strings::SubstituteAndAppend(&contents, "syntax = \"$0\";\n\n",
-                                 SyntaxName(syntax()));
-    syntax_comment.AddPostComment(&contents);
-  }
-
-  SourceLocationCommentPrinter
-      comment_printer(this, "", debug_string_options);
-  comment_printer.AddPreComment(&contents);
+  string contents = "syntax = \"proto2\";\n\n";
 
   set<int> public_dependencies;
   set<int> weak_dependencies;
@@ -2036,13 +1828,7 @@ string FileDescriptor::DebugStringWithOptions(
   }
 
   if (!package().empty()) {
-    vector<int> path;
-    path.push_back(FileDescriptorProto::kPackageFieldNumber);
-    SourceLocationCommentPrinter package_comment(
-        this, path, "", debug_string_options);
-    package_comment.AddPreComment(&contents);
     strings::SubstituteAndAppend(&contents, "package $0;\n\n", package());
-    package_comment.AddPostComment(&contents);
   }
 
   if (FormatLineOptions(0, options(), &contents)) {
@@ -2050,7 +1836,7 @@ string FileDescriptor::DebugStringWithOptions(
   }
 
   for (int i = 0; i < enum_type_count(); i++) {
-    enum_type(i)->DebugString(0, &contents, debug_string_options);
+    enum_type(i)->DebugString(0, &contents);
     contents.append("\n");
   }
 
@@ -2065,14 +1851,15 @@ string FileDescriptor::DebugStringWithOptions(
 
   for (int i = 0; i < message_type_count(); i++) {
     if (groups.count(message_type(i)) == 0) {
-      message_type(i)->DebugString(0, &contents, debug_string_options,
-                                   /* include_opening_clause */ true);
+      strings::SubstituteAndAppend(&contents, "message $0",
+                                   message_type(i)->name());
+      message_type(i)->DebugString(0, &contents);
       contents.append("\n");
     }
   }
 
   for (int i = 0; i < service_count(); i++) {
-    service(i)->DebugString(&contents, debug_string_options);
+    service(i)->DebugString(&contents);
     contents.append("\n");
   }
 
@@ -2084,46 +1871,23 @@ string FileDescriptor::DebugStringWithOptions(
       strings::SubstituteAndAppend(&contents, "extend .$0 {\n",
                                    containing_type->full_name());
     }
-    extension(i)->DebugString(1, FieldDescriptor::PRINT_LABEL, &contents,
-                              debug_string_options);
+    extension(i)->DebugString(1, FieldDescriptor::PRINT_LABEL, &contents);
   }
   if (extension_count() > 0) contents.append("}\n\n");
-
-  comment_printer.AddPostComment(&contents);
 
   return contents;
 }
 
 string Descriptor::DebugString() const {
-  DebugStringOptions options;  // default options
-  return DebugStringWithOptions(options);
-}
-
-string Descriptor::DebugStringWithOptions(
-    const DebugStringOptions& options) const {
   string contents;
-  DebugString(0, &contents, options, /* include_opening_clause */ true);
+  strings::SubstituteAndAppend(&contents, "message $0", name());
+  DebugString(0, &contents);
   return contents;
 }
 
-void Descriptor::DebugString(int depth, string *contents,
-                             const DebugStringOptions&
-                             debug_string_options,
-                             bool include_opening_clause) const {
-  if (options().map_entry()) {
-    // Do not generate debug string for auto-generated map-entry type.
-    return;
-  }
+void Descriptor::DebugString(int depth, string *contents) const {
   string prefix(depth * 2, ' ');
   ++depth;
-
-  SourceLocationCommentPrinter
-      comment_printer(this, prefix, debug_string_options);
-  comment_printer.AddPreComment(contents);
-
-  if (include_opening_clause) {
-    strings::SubstituteAndAppend(contents, "$0message $1", prefix, name());
-  }
   contents->append(" {\n");
 
   FormatLineOptions(depth, options(), contents);
@@ -2145,21 +1909,20 @@ void Descriptor::DebugString(int depth, string *contents,
 
   for (int i = 0; i < nested_type_count(); i++) {
     if (groups.count(nested_type(i)) == 0) {
-      nested_type(i)->DebugString(depth, contents, debug_string_options,
-                                  /* include_opening_clause */ true);
+      strings::SubstituteAndAppend(contents, "$0  message $1",
+                                   prefix, nested_type(i)->name());
+      nested_type(i)->DebugString(depth, contents);
     }
   }
   for (int i = 0; i < enum_type_count(); i++) {
-    enum_type(i)->DebugString(depth, contents, debug_string_options);
+    enum_type(i)->DebugString(depth, contents);
   }
   for (int i = 0; i < field_count(); i++) {
     if (field(i)->containing_oneof() == NULL) {
-      field(i)->DebugString(depth, FieldDescriptor::PRINT_LABEL, contents,
-                            debug_string_options);
+      field(i)->DebugString(depth, FieldDescriptor::PRINT_LABEL, contents);
     } else if (field(i)->containing_oneof()->field(0) == field(i)) {
       // This is the first field in this oneof, so print the whole oneof.
-      field(i)->containing_oneof()->DebugString(depth, contents,
-                                                debug_string_options);
+      field(i)->containing_oneof()->DebugString(depth, contents);
     }
   }
 
@@ -2180,23 +1943,15 @@ void Descriptor::DebugString(int depth, string *contents,
                                    prefix, containing_type->full_name());
     }
     extension(i)->DebugString(
-        depth + 1, FieldDescriptor::PRINT_LABEL, contents,
-        debug_string_options);
+        depth + 1, FieldDescriptor::PRINT_LABEL, contents);
   }
   if (extension_count() > 0)
     strings::SubstituteAndAppend(contents, "$0  }\n", prefix);
 
   strings::SubstituteAndAppend(contents, "$0}\n", prefix);
-  comment_printer.AddPostComment(contents);
 }
 
 string FieldDescriptor::DebugString() const {
-  DebugStringOptions options;  // default options
-  return DebugStringWithOptions(options);
-}
-
-string FieldDescriptor::DebugStringWithOptions(
-    const DebugStringOptions& debug_string_options) const {
   string contents;
   int depth = 0;
   if (is_extension()) {
@@ -2204,52 +1959,34 @@ string FieldDescriptor::DebugStringWithOptions(
                                  containing_type()->full_name());
     depth = 1;
   }
-  DebugString(depth, PRINT_LABEL, &contents, debug_string_options);
+  DebugString(depth, PRINT_LABEL, &contents);
   if (is_extension()) {
     contents.append("}\n");
   }
   return contents;
 }
 
-// The field type string used in FieldDescriptor::DebugString()
-string FieldDescriptor::FieldTypeNameDebugString() const {
-  switch(type()) {
-    case TYPE_MESSAGE:
-      return "." + message_type()->full_name();
-    case TYPE_ENUM:
-      return "." + enum_type()->full_name();
-    default:
-      return kTypeToName[type()];
-  }
-}
-
 void FieldDescriptor::DebugString(int depth,
                                   PrintLabelFlag print_label_flag,
-                                  string *contents,
-                                  const DebugStringOptions&
-                                  debug_string_options) const {
+                                  string *contents) const {
   string prefix(depth * 2, ' ');
   string field_type;
-
-  // Special case map fields.
-  if (is_map()) {
-    strings::SubstituteAndAppend(
-        &field_type, "map<$0, $1>",
-        message_type()->field(0)->FieldTypeNameDebugString(),
-        message_type()->field(1)->FieldTypeNameDebugString());
-  } else {
-    field_type = FieldTypeNameDebugString();
+  switch (type()) {
+    case TYPE_MESSAGE:
+      field_type = "." + message_type()->full_name();
+      break;
+    case TYPE_ENUM:
+      field_type = "." + enum_type()->full_name();
+      break;
+    default:
+      field_type = kTypeToName[type()];
   }
 
   string label;
-  if (print_label_flag == PRINT_LABEL && !is_map()) {
+  if (print_label_flag == PRINT_LABEL) {
     label = kLabelToName[this->label()];
     label.push_back(' ');
   }
-
-  SourceLocationCommentPrinter
-      comment_printer(this, prefix, debug_string_options);
-  comment_printer.AddPreComment(contents);
 
   strings::SubstituteAndAppend(contents, "$0$1$2 $3 = $4",
                                prefix,
@@ -2278,101 +2015,57 @@ void FieldDescriptor::DebugString(int depth,
   }
 
   if (type() == TYPE_GROUP) {
-    message_type()->DebugString(depth, contents, debug_string_options,
-                                /* include_opening_clause */ false);
+    message_type()->DebugString(depth, contents);
   } else {
     contents->append(";\n");
   }
-
-  comment_printer.AddPostComment(contents);
 }
 
 string OneofDescriptor::DebugString() const {
-  DebugStringOptions options;  // default values
-  return DebugStringWithOptions(options);
-}
-
-string OneofDescriptor::DebugStringWithOptions(
-    const DebugStringOptions& options) const {
   string contents;
-  DebugString(0, &contents, options);
+  DebugString(0, &contents);
   return contents;
 }
 
-void OneofDescriptor::DebugString(int depth, string* contents,
-                                  const DebugStringOptions&
-                                  debug_string_options) const {
+void OneofDescriptor::DebugString(int depth, string* contents) const {
   string prefix(depth * 2, ' ');
   ++depth;
-  SourceLocationCommentPrinter
-      comment_printer(this, prefix, debug_string_options);
-  comment_printer.AddPreComment(contents);
   strings::SubstituteAndAppend(
       contents, "$0 oneof $1 {\n", prefix, name());
   for (int i = 0; i < field_count(); i++) {
-    field(i)->DebugString(depth, FieldDescriptor::OMIT_LABEL, contents,
-                          debug_string_options);
+    field(i)->DebugString(depth, FieldDescriptor::OMIT_LABEL, contents);
   }
   strings::SubstituteAndAppend(contents, "$0}\n", prefix);
-  comment_printer.AddPostComment(contents);
 }
 
 string EnumDescriptor::DebugString() const {
-  DebugStringOptions options;  // default values
-  return DebugStringWithOptions(options);
-}
-
-string EnumDescriptor::DebugStringWithOptions(
-    const DebugStringOptions& options) const {
   string contents;
-  DebugString(0, &contents, options);
+  DebugString(0, &contents);
   return contents;
 }
 
-void EnumDescriptor::DebugString(int depth, string *contents,
-                                 const DebugStringOptions&
-                                 debug_string_options) const {
+void EnumDescriptor::DebugString(int depth, string *contents) const {
   string prefix(depth * 2, ' ');
   ++depth;
-
-  SourceLocationCommentPrinter
-      comment_printer(this, prefix, debug_string_options);
-  comment_printer.AddPreComment(contents);
-
   strings::SubstituteAndAppend(contents, "$0enum $1 {\n",
                                prefix, name());
 
   FormatLineOptions(depth, options(), contents);
 
   for (int i = 0; i < value_count(); i++) {
-    value(i)->DebugString(depth, contents, debug_string_options);
+    value(i)->DebugString(depth, contents);
   }
   strings::SubstituteAndAppend(contents, "$0}\n", prefix);
-
-  comment_printer.AddPostComment(contents);
 }
 
 string EnumValueDescriptor::DebugString() const {
-  DebugStringOptions options;  // default values
-  return DebugStringWithOptions(options);
-}
-
-string EnumValueDescriptor::DebugStringWithOptions(
-    const DebugStringOptions& options) const {
   string contents;
-  DebugString(0, &contents, options);
+  DebugString(0, &contents);
   return contents;
 }
 
-void EnumValueDescriptor::DebugString(int depth, string *contents,
-                                      const DebugStringOptions&
-                                      debug_string_options) const {
+void EnumValueDescriptor::DebugString(int depth, string *contents) const {
   string prefix(depth * 2, ' ');
-
-  SourceLocationCommentPrinter
-      comment_printer(this, prefix, debug_string_options);
-  comment_printer.AddPreComment(contents);
-
   strings::SubstituteAndAppend(contents, "$0$1 = $2",
                                prefix, name(), number());
 
@@ -2381,70 +2074,39 @@ void EnumValueDescriptor::DebugString(int depth, string *contents,
     strings::SubstituteAndAppend(contents, " [$0]", formatted_options);
   }
   contents->append(";\n");
-
-  comment_printer.AddPostComment(contents);
 }
 
 string ServiceDescriptor::DebugString() const {
-  DebugStringOptions options;  // default values
-  return DebugStringWithOptions(options);
-}
-
-string ServiceDescriptor::DebugStringWithOptions(
-    const DebugStringOptions& options) const {
   string contents;
-  DebugString(&contents, options);
+  DebugString(&contents);
   return contents;
 }
 
-void ServiceDescriptor::DebugString(string *contents,
-                                    const DebugStringOptions&
-                                    debug_string_options) const {
-  SourceLocationCommentPrinter
-      comment_printer(this, /* prefix */ "", debug_string_options);
-  comment_printer.AddPreComment(contents);
-
+void ServiceDescriptor::DebugString(string *contents) const {
   strings::SubstituteAndAppend(contents, "service $0 {\n", name());
 
   FormatLineOptions(1, options(), contents);
 
   for (int i = 0; i < method_count(); i++) {
-    method(i)->DebugString(1, contents, debug_string_options);
+    method(i)->DebugString(1, contents);
   }
 
   contents->append("}\n");
-
-  comment_printer.AddPostComment(contents);
 }
 
 string MethodDescriptor::DebugString() const {
-  DebugStringOptions options;  // default values
-  return DebugStringWithOptions(options);
-}
-
-string MethodDescriptor::DebugStringWithOptions(
-    const DebugStringOptions& options) const {
   string contents;
-  DebugString(0, &contents, options);
+  DebugString(0, &contents);
   return contents;
 }
 
-void MethodDescriptor::DebugString(int depth, string *contents,
-                                   const DebugStringOptions&
-                                   debug_string_options) const {
+void MethodDescriptor::DebugString(int depth, string *contents) const {
   string prefix(depth * 2, ' ');
   ++depth;
-
-  SourceLocationCommentPrinter
-      comment_printer(this, prefix, debug_string_options);
-  comment_printer.AddPreComment(contents);
-
-  strings::SubstituteAndAppend(contents, "$0rpc $1($4.$2) returns ($5.$3)",
+  strings::SubstituteAndAppend(contents, "$0rpc $1(.$2) returns (.$3)",
                                prefix, name(),
                                input_type()->full_name(),
-                               output_type()->full_name(),
-                               client_streaming() ? "stream " : "",
-                               server_streaming() ? "stream " : "");
+                               output_type()->full_name());
 
   string formatted_options;
   if (FormatLineOptions(depth, options(), &formatted_options)) {
@@ -2453,8 +2115,6 @@ void MethodDescriptor::DebugString(int depth, string *contents,
   } else {
     contents->append(";\n");
   }
-
-  comment_printer.AddPostComment(contents);
 }
 
 
@@ -2475,19 +2135,11 @@ bool FileDescriptor::GetSourceLocation(const vector<int>& path,
 
         out_location->leading_comments = loc->leading_comments();
         out_location->trailing_comments = loc->trailing_comments();
-        out_location->leading_detached_comments.assign(
-            loc->leading_detached_comments().begin(),
-            loc->leading_detached_comments().end());
         return true;
       }
     }
   }
   return false;
-}
-
-bool FileDescriptor::GetSourceLocation(SourceLocation* out_location) const {
-  vector<int> path;  // empty path for root FileDescriptor
-  return GetSourceLocation(path, out_location);
 }
 
 bool FieldDescriptor::is_packed() const {
@@ -2757,7 +2409,7 @@ class DescriptorBuilder {
 
   // Creates a placeholder file.  Never returns NULL.  This is used when an
   // import is not found and AllowUnknownDependencies() is enabled.
-  FileDescriptor* NewPlaceholderFile(const string& name);
+  const FileDescriptor* NewPlaceholderFile(const string& name);
 
   // Calls tables_->AddSymbol() and records an error if it fails.  Returns
   // true if successful or false if failed, though most callers can ignore
@@ -3015,24 +2667,9 @@ class DescriptorBuilder {
                               const ServiceDescriptorProto& proto);
   void ValidateMethodOptions(MethodDescriptor* method,
                              const MethodDescriptorProto& proto);
-  void ValidateProto3(FileDescriptor* file,
-                      const FileDescriptorProto& proto);
-  void ValidateProto3Message(Descriptor* message,
-                             const DescriptorProto& proto);
-  void ValidateProto3Field(FieldDescriptor* field,
-                           const FieldDescriptorProto& proto);
-  void ValidateProto3Enum(EnumDescriptor* enm,
-                          const EnumDescriptorProto& proto);
 
-  // Returns true if the map entry message is compatible with the
-  // auto-generated entry message from map fields syntax.
-  bool ValidateMapEntry(FieldDescriptor* field,
-                        const FieldDescriptorProto& proto);
-
-  // Recursively detects naming conflicts with map entry types for a
-  // better error message.
-  void DetectMapConflicts(const Descriptor* message,
-                          const DescriptorProto& proto);
+  void ValidateMapKey(FieldDescriptor* field,
+                      const FieldDescriptorProto& proto);
 
 };
 
@@ -3355,9 +2992,19 @@ Symbol DescriptorBuilder::NewPlaceholder(const string& name,
   }
 
   // Create the placeholders.
-  FileDescriptor* placeholder_file = NewPlaceholderFile(
-      *placeholder_full_name + ".placeholder.proto");
+  FileDescriptor* placeholder_file = tables_->Allocate<FileDescriptor>();
+  memset(placeholder_file, 0, sizeof(*placeholder_file));
+
+  placeholder_file->source_code_info_ = &SourceCodeInfo::default_instance();
+
+  placeholder_file->name_ =
+    tables_->AllocateString(*placeholder_full_name + ".placeholder.proto");
   placeholder_file->package_ = placeholder_package;
+  placeholder_file->pool_ = pool_;
+  placeholder_file->options_ = &FileOptions::default_instance();
+  placeholder_file->tables_ = &FileDescriptorTables::kEmpty;
+  placeholder_file->is_placeholder_ = true;
+  // All other fields are zero or NULL.
 
   if (placeholder_type == PLACEHOLDER_ENUM) {
     placeholder_file->enum_type_count_ = 1;
@@ -3421,7 +3068,7 @@ Symbol DescriptorBuilder::NewPlaceholder(const string& name,
   }
 }
 
-FileDescriptor* DescriptorBuilder::NewPlaceholderFile(
+const FileDescriptor* DescriptorBuilder::NewPlaceholderFile(
     const string& name) {
   FileDescriptor* placeholder = tables_->Allocate<FileDescriptor>();
   memset(placeholder, 0, sizeof(*placeholder));
@@ -3431,9 +3078,7 @@ FileDescriptor* DescriptorBuilder::NewPlaceholderFile(
   placeholder->pool_ = pool_;
   placeholder->options_ = &FileOptions::default_instance();
   placeholder->tables_ = &FileDescriptorTables::kEmpty;
-  placeholder->source_code_info_ = &SourceCodeInfo::default_instance();
   placeholder->is_placeholder_ = true;
-  placeholder->syntax_ = FileDescriptor::SYNTAX_PROTO2;
   // All other fields are zero or NULL.
 
   return placeholder;
@@ -3651,7 +3296,7 @@ const FileDescriptor* DescriptorBuilder::BuildFile(
   // Note:  This only works if the input is canonical -- that is, it
   //   fully-qualifies all type names, has no UninterpretedOptions, etc.
   //   This is fine, because this idempotency "feature" really only exists to
-  //   accommodate one hack in the proto1->proto2 migration layer.
+  //   accomodate one hack in the proto1->proto2 migration layer.
   const FileDescriptor* existing_file = tables_->FindFile(filename_);
   if (existing_file != NULL) {
     // File already in pool.  Compare the existing one to the input.
@@ -3716,18 +3361,6 @@ const FileDescriptor* DescriptorBuilder::BuildFile(
   if (!proto.has_name()) {
     AddError("", proto, DescriptorPool::ErrorCollector::OTHER,
              "Missing field: FileDescriptorProto.name.");
-  }
-
-  // TODO(liujisi): Report error when the syntax is empty after all the protos
-  // have added the syntax statement.
-  if (proto.syntax().empty() || proto.syntax() == "proto2") {
-    file_->syntax_ = FileDescriptor::SYNTAX_PROTO2;
-  } else if (proto.syntax() == "proto3") {
-    file_->syntax_ = FileDescriptor::SYNTAX_PROTO3;
-  } else {
-    file_->syntax_ = FileDescriptor::SYNTAX_UNKNOWN;
-    AddError(proto.name(), proto, DescriptorPool::ErrorCollector::OTHER,
-             "Unrecognized syntax: " + proto.syntax());
   }
 
   result->name_ = tables_->AllocateString(proto.name());
@@ -3873,14 +3506,6 @@ const FileDescriptor* DescriptorBuilder::BuildFile(
     ValidateFileOptions(result, proto);
   }
 
-  // Additional naming conflict check for map entry types. Only need to check
-  // this if there are already errors.
-  if (had_errors_) {
-    for (int i = 0; i < proto.message_type_size(); ++i) {
-      DetectMapConflicts(result->message_type(i), proto.message_type(i));
-    }
-  }
-
 
   if (!unused_dependency_.empty()) {
     LogUnusedDependency(result);
@@ -3996,9 +3621,7 @@ void DescriptorBuilder::BuildFieldOrExtension(const FieldDescriptorProto& proto,
   // Don't bother with the above optimization for camel-case names since
   // .proto files that follow the guide shouldn't be using names in this
   // format, so the optimization wouldn't help much.
-  result->camelcase_name_ =
-      tables_->AllocateString(ToCamelCase(proto.name(),
-                                          /* lower_first = */ true));
+  result->camelcase_name_ = tables_->AllocateString(ToCamelCase(proto.name()));
 
   // Some compilers do not allow static_cast directly between two enum types,
   // so we must cast to int first.
@@ -4023,6 +3646,7 @@ void DescriptorBuilder::BuildFieldOrExtension(const FieldDescriptorProto& proto,
   // Some of these may be filled in when cross-linking.
   result->containing_type_ = NULL;
   result->extension_scope_ = NULL;
+  result->experimental_map_key_ = NULL;
   result->message_type_ = NULL;
   result->enum_type_ = NULL;
 
@@ -4441,9 +4065,6 @@ void DescriptorBuilder::BuildMethod(const MethodDescriptorProto& proto,
     AllocateOptions(proto.options(), result);
   }
 
-  result->client_streaming_ = proto.client_streaming();
-  result->server_streaming_ = proto.server_streaming();
-
   AddSymbol(result->full_name(), parent, result->name(),
             proto, Symbol(result));
 }
@@ -4851,98 +4472,8 @@ void DescriptorBuilder::ValidateFileOptions(FileDescriptor* file,
       }
     }
   }
-  if (file->syntax() == FileDescriptor::SYNTAX_PROTO3) {
-    ValidateProto3(file, proto);
-  }
 }
 
-void DescriptorBuilder::ValidateProto3(
-    FileDescriptor* file, const FileDescriptorProto& proto) {
-  for (int i = 0; i < file->extension_count(); ++i) {
-    ValidateProto3Field(file->extensions_ + i, proto.extension(i));
-  }
-  for (int i = 0; i < file->message_type_count(); ++i) {
-    ValidateProto3Message(file->message_types_ + i, proto.message_type(i));
-  }
-  for (int i = 0; i < file->enum_type_count(); ++i) {
-    ValidateProto3Enum(file->enum_types_ + i, proto.enum_type(i));
-  }
-  if (IsLite(file)) {
-    AddError(file->name(), proto,
-             DescriptorPool::ErrorCollector::OTHER,
-             "Lite runtime is not supported in proto3.");
-  }
-}
-
-void DescriptorBuilder::ValidateProto3Message(
-    Descriptor* message, const DescriptorProto& proto) {
-  for (int i = 0; i < message->nested_type_count(); ++i) {
-    ValidateProto3Message(message->nested_types_ + i,
-                                 proto.nested_type(i));
-  }
-  for (int i = 0; i < message->enum_type_count(); ++i) {
-    ValidateProto3Enum(message->enum_types_ + i,
-                              proto.enum_type(i));
-  }
-  for (int i = 0; i < message->field_count(); ++i) {
-    ValidateProto3Field(message->fields_ + i, proto.field(i));
-  }
-  for (int i = 0; i < message->extension_count(); ++i) {
-    ValidateProto3Field(message->extensions_ +i, proto.extension(i));
-  }
-  if (message->extension_range_count() > 0) {
-    AddError(message->full_name(), proto,
-             DescriptorPool::ErrorCollector::OTHER,
-             "Extension ranges are not allowed in proto3.");
-  }
-  if (message->options().message_set_wire_format()) {
-    // Using MessageSet doesn't make sense since we disallow extensions.
-    AddError(message->full_name(), proto,
-             DescriptorPool::ErrorCollector::OTHER,
-             "MessageSet is not supported in proto3.");
-  }
-}
-
-void DescriptorBuilder::ValidateProto3Field(
-    FieldDescriptor* field, const FieldDescriptorProto& proto) {
-  if (field->is_extension() &&
-      !AllowedExtendeeInProto3(field->containing_type()->full_name())) {
-    AddError(field->full_name(), proto,
-             DescriptorPool::ErrorCollector::OTHER,
-             "Extensions in proto3 are only allowed for defining options.");
-  }
-  if (field->is_required()) {
-    AddError(field->full_name(), proto,
-             DescriptorPool::ErrorCollector::OTHER,
-             "Required fields are not allowed in proto3.");
-  }
-  if (field->has_default_value()) {
-    AddError(
-        field->full_name(), proto, DescriptorPool::ErrorCollector::OTHER,
-        "Explicit default values are not allowed in proto3.");
-  }
-  if (field->cpp_type() == FieldDescriptor::CPPTYPE_ENUM &&
-      field->enum_type() &&
-      field->enum_type()->file()->syntax() != FileDescriptor::SYNTAX_PROTO3) {
-    // Proto3 messages can only use Proto3 enum types; otherwise we can't
-    // guarantee that the default value is zero.
-    AddError(field->full_name(), proto,
-             DescriptorPool::ErrorCollector::TYPE,
-             "Enum type \"" + field->enum_type()->full_name() +
-             "\" is not a proto3 enum, but is used in \"" +
-             field->containing_type()->full_name() +
-             "\" which is a proto3 message type.");
-  }
-}
-
-void DescriptorBuilder::ValidateProto3Enum(
-    EnumDescriptor* enm, const EnumDescriptorProto& proto) {
-  if (enm->value_count() > 0 && enm->value(0)->number() != 0) {
-    AddError(
-        enm->full_name(), proto, DescriptorPool::ErrorCollector::OTHER,
-        "The first enum value must be zero in proto3.");
-  }
-}
 
 void DescriptorBuilder::ValidateMessageOptions(Descriptor* message,
                                                const DescriptorProto& proto) {
@@ -4968,6 +4499,10 @@ void DescriptorBuilder::ValidateMessageOptions(Descriptor* message,
 
 void DescriptorBuilder::ValidateFieldOptions(FieldDescriptor* field,
     const FieldDescriptorProto& proto) {
+  if (field->options().has_experimental_map_key()) {
+    ValidateMapKey(field, proto);
+  }
+
   // Only message type fields may be lazy.
   if (field->options().lazy()) {
     if (field->type() != FieldDescriptor::TYPE_MESSAGE) {
@@ -5014,16 +4549,6 @@ void DescriptorBuilder::ValidateFieldOptions(FieldDescriptor* field,
              "Extensions to non-lite types can only be declared in non-lite "
              "files.  Note that you cannot extend a non-lite type to contain "
              "a lite type, but the reverse is allowed.");
-  }
-
-  // Validate map types.
-  if (field->is_map()) {
-    if (!ValidateMapEntry(field, proto)) {
-      AddError(field->full_name(), proto,
-               DescriptorPool::ErrorCollector::OTHER,
-               "map_entry should not be set explicitly. Use map<KeyType, "
-               "ValueType> instead.");
-    }
   }
 
 }
@@ -5083,127 +4608,57 @@ void DescriptorBuilder::ValidateMethodOptions(MethodDescriptor* /* method */,
   // Nothing to do so far.
 }
 
-bool DescriptorBuilder::ValidateMapEntry(FieldDescriptor* field,
-                                         const FieldDescriptorProto& proto) {
-  const Descriptor* message = field->message_type();
-  if (// Must not contain extensions, extension range or nested message or
-      // enums
-      message->extension_count() != 0 ||
-      field->label() != FieldDescriptor::LABEL_REPEATED ||
-      message->extension_range_count() != 0 ||
-      message->nested_type_count() != 0 || message->enum_type_count() != 0 ||
-      // Must contain exactly two fields
-      message->field_count() != 2 ||
-      // Field name and message name must match
-      message->name() != ToCamelCase(field->name(), false) + "Entry" ||
-      // Entry message must be in the same containing type of the field.
-      field->containing_type() != message->containing_type()) {
-    return false;
+void DescriptorBuilder::ValidateMapKey(FieldDescriptor* field,
+                                       const FieldDescriptorProto& proto) {
+  if (!field->is_repeated()) {
+    AddError(field->full_name(), proto, DescriptorPool::ErrorCollector::TYPE,
+             "map type is only allowed for repeated fields.");
+    return;
   }
 
-  const FieldDescriptor* key = message->field(0);
-  const FieldDescriptor* value = message->field(1);
-  if (key->label() != FieldDescriptor::LABEL_OPTIONAL || key->number() != 1 ||
-      key->name() != "key") {
-    return false;
-  }
-  if (value->label() != FieldDescriptor::LABEL_OPTIONAL ||
-      value->number() != 2 || value->name() != "value") {
-    return false;
+  if (field->cpp_type() != FieldDescriptor::CPPTYPE_MESSAGE) {
+    AddError(field->full_name(), proto, DescriptorPool::ErrorCollector::TYPE,
+             "map type is only allowed for fields with a message type.");
+    return;
   }
 
-  // Check key types are legal.
-  switch (key->type()) {
-    case FieldDescriptor::TYPE_ENUM:
-      AddError(
-          field->full_name(), proto, DescriptorPool::ErrorCollector::TYPE,
-          "Key in map fields cannot be enum types.");
-      break;
-    case FieldDescriptor::TYPE_FLOAT:
-    case FieldDescriptor::TYPE_DOUBLE:
-    case FieldDescriptor::TYPE_MESSAGE:
-    case FieldDescriptor::TYPE_GROUP:
-    case FieldDescriptor::TYPE_BYTES:
-      AddError(
-          field->full_name(), proto, DescriptorPool::ErrorCollector::TYPE,
-          "Key in map fields cannot be float/double, bytes or message types.");
-      break;
-    case FieldDescriptor::TYPE_BOOL:
-    case FieldDescriptor::TYPE_INT32:
-    case FieldDescriptor::TYPE_INT64:
-    case FieldDescriptor::TYPE_SINT32:
-    case FieldDescriptor::TYPE_SINT64:
-    case FieldDescriptor::TYPE_STRING:
-    case FieldDescriptor::TYPE_UINT32:
-    case FieldDescriptor::TYPE_UINT64:
-    case FieldDescriptor::TYPE_FIXED32:
-    case FieldDescriptor::TYPE_FIXED64:
-    case FieldDescriptor::TYPE_SFIXED32:
-    case FieldDescriptor::TYPE_SFIXED64:
-      // Legal cases
-      break;
-    // Do not add a default, so that the compiler will complain when new types
-    // are added.
+  const Descriptor* item_type = field->message_type();
+  if (item_type == NULL) {
+    AddError(field->full_name(), proto, DescriptorPool::ErrorCollector::TYPE,
+             "Could not find field type.");
+    return;
   }
 
-  return true;
-}
+  // Find the field in item_type named by "experimental_map_key"
+  const string& key_name = field->options().experimental_map_key();
+  const Symbol key_symbol = LookupSymbol(
+      key_name,
+      // We append ".key_name" to the containing type's name since
+      // LookupSymbol() searches for peers of the supplied name, not
+      // children of the supplied name.
+      item_type->full_name() + "." + key_name);
 
-void DescriptorBuilder::DetectMapConflicts(const Descriptor* message,
-                                           const DescriptorProto& proto) {
-  map<string, const Descriptor*> seen_types;
-  for (int i = 0; i < message->nested_type_count(); ++i) {
-    const Descriptor* nested = message->nested_type(i);
-    pair<map<string, const Descriptor*>::iterator, bool> result =
-        seen_types.insert(std::make_pair(nested->name(), nested));
-    if (!result.second) {
-      if (result.first->second->options().map_entry() ||
-          nested->options().map_entry()) {
-        AddError(message->full_name(), proto,
-                 DescriptorPool::ErrorCollector::NAME,
-                 "Expanded map entry type " + nested->name() +
-                 " conflicts with an existing nested message type.");
-      }
-    }
-    // Recursively test on the nested types.
-    DetectMapConflicts(message->nested_type(i), proto.nested_type(i));
+  if (key_symbol.IsNull() || key_symbol.field_descriptor->is_extension()) {
+    AddError(field->full_name(), proto, DescriptorPool::ErrorCollector::TYPE,
+             "Could not find field named \"" + key_name + "\" in type \"" +
+             item_type->full_name() + "\".");
+    return;
   }
-  // Check for conflicted field names.
-  for (int i = 0; i < message->field_count(); ++i) {
-    const FieldDescriptor* field = message->field(i);
-    map<string, const Descriptor*>::iterator iter =
-        seen_types.find(field->name());
-    if (iter != seen_types.end() && iter->second->options().map_entry()) {
-      AddError(message->full_name(), proto,
-               DescriptorPool::ErrorCollector::NAME,
-               "Expanded map entry type " + iter->second->name() +
-               " conflicts with an existing field.");
-    }
+  const FieldDescriptor* key_field = key_symbol.field_descriptor;
+
+  if (key_field->is_repeated()) {
+    AddError(field->full_name(), proto, DescriptorPool::ErrorCollector::TYPE,
+             "map_key must not name a repeated field.");
+    return;
   }
-  // Check for conflicted enum names.
-  for (int i = 0; i < message->enum_type_count(); ++i) {
-    const EnumDescriptor* enum_desc = message->enum_type(i);
-    map<string, const Descriptor*>::iterator iter =
-        seen_types.find(enum_desc->name());
-    if (iter != seen_types.end() && iter->second->options().map_entry()) {
-      AddError(message->full_name(), proto,
-               DescriptorPool::ErrorCollector::NAME,
-               "Expanded map entry type " + iter->second->name() +
-               " conflicts with an existing enum type.");
-    }
+
+  if (key_field->cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE) {
+    AddError(field->full_name(), proto, DescriptorPool::ErrorCollector::TYPE,
+             "map key must name a scalar or string field.");
+    return;
   }
-  // Check for conflicted oneof names.
-  for (int i = 0; i < message->oneof_decl_count(); ++i) {
-    const OneofDescriptor* oneof_desc = message->oneof_decl(i);
-    map<string, const Descriptor*>::iterator iter =
-        seen_types.find(oneof_desc->name());
-    if (iter != seen_types.end() && iter->second->options().map_entry()) {
-      AddError(message->full_name(), proto,
-               DescriptorPool::ErrorCollector::NAME,
-               "Expanded map entry type " + iter->second->name() +
-               " conflicts with an existing oneof type.");
-    }
-  }
+
+  field->experimental_map_key_ = key_field;
 }
 
 

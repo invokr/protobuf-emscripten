@@ -35,28 +35,32 @@ import com.google.protobuf.DescriptorProtos.EnumDescriptorProto;
 import com.google.protobuf.DescriptorProtos.EnumValueDescriptorProto;
 import com.google.protobuf.DescriptorProtos.FieldDescriptorProto;
 import com.google.protobuf.DescriptorProtos.FileDescriptorProto;
-import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.DescriptorValidationException;
+import com.google.protobuf.Descriptors.FileDescriptor;
+import com.google.protobuf.Descriptors.Descriptor;
+import com.google.protobuf.Descriptors.FieldDescriptor;
+import com.google.protobuf.Descriptors.OneofDescriptor;
 import com.google.protobuf.Descriptors.EnumDescriptor;
 import com.google.protobuf.Descriptors.EnumValueDescriptor;
-import com.google.protobuf.Descriptors.FieldDescriptor;
-import com.google.protobuf.Descriptors.FileDescriptor;
-import com.google.protobuf.Descriptors.MethodDescriptor;
-import com.google.protobuf.Descriptors.OneofDescriptor;
 import com.google.protobuf.Descriptors.ServiceDescriptor;
+import com.google.protobuf.Descriptors.MethodDescriptor;
+
 import com.google.protobuf.test.UnittestImport;
 import com.google.protobuf.test.UnittestImport.ImportEnum;
-import protobuf_unittest.TestCustomOptions;
-import protobuf_unittest.UnittestCustomOptions;
+import com.google.protobuf.test.UnittestImport.ImportMessage;
 import protobuf_unittest.UnittestProto;
 import protobuf_unittest.UnittestProto.ForeignEnum;
 import protobuf_unittest.UnittestProto.ForeignMessage;
-import protobuf_unittest.UnittestProto.TestAllExtensions;
 import protobuf_unittest.UnittestProto.TestAllTypes;
+import protobuf_unittest.UnittestProto.TestAllExtensions;
 import protobuf_unittest.UnittestProto.TestExtremeDefaultValues;
 import protobuf_unittest.UnittestProto.TestMultipleExtensionRanges;
 import protobuf_unittest.UnittestProto.TestRequired;
 import protobuf_unittest.UnittestProto.TestService;
+import protobuf_unittest.UnittestCustomOptions;
+
+import protobuf_unittest.TestCustomOptions;
+
 
 import junit.framework.TestCase;
 
@@ -282,7 +286,7 @@ public class DescriptorsTest extends TestCase {
     d = TestExtremeDefaultValues.getDescriptor();
     assertEquals(
       ByteString.copyFrom(
-        "\0\001\007\b\f\n\r\t\013\\\'\"\u00fe".getBytes(Internal.ISO_8859_1)),
+        "\0\001\007\b\f\n\r\t\013\\\'\"\u00fe".getBytes("ISO-8859-1")),
       d.findFieldByName("escaped_bytes").getDefaultValue());
     assertEquals(-1, d.findFieldByName("large_uint32").getDefaultValue());
     assertEquals(-1L, d.findFieldByName("large_uint64").getDefaultValue());
@@ -493,7 +497,7 @@ public class DescriptorsTest extends TestCase {
       .build();
     // translate and crosslink
     FileDescriptor file =
-      Descriptors.FileDescriptor.buildFrom(fileDescriptorProto,
+      Descriptors.FileDescriptor.buildFrom(fileDescriptorProto, 
           new FileDescriptor[0]);
     // verify resulting descriptors
     assertNotNull(file);
@@ -514,7 +518,7 @@ public class DescriptorsTest extends TestCase {
     }
     assertTrue(barFound);
   }
-
+  
   public void testDependencyOrder() throws Exception {
     FileDescriptorProto fooProto = FileDescriptorProto.newBuilder()
         .setName("foo.proto").build();
@@ -533,14 +537,14 @@ public class DescriptorsTest extends TestCase {
         new FileDescriptor[0]);
     FileDescriptor barFile = Descriptors.FileDescriptor.buildFrom(barProto,
         new FileDescriptor[] {fooFile});
-
-    // Items in the FileDescriptor array can be in any order.
+    
+    // Items in the FileDescriptor array can be in any order. 
     Descriptors.FileDescriptor.buildFrom(bazProto,
         new FileDescriptor[] {fooFile, barFile});
     Descriptors.FileDescriptor.buildFrom(bazProto,
         new FileDescriptor[] {barFile, fooFile});
   }
-
+  
   public void testInvalidPublicDependency() throws Exception {
     FileDescriptorProto fooProto = FileDescriptorProto.newBuilder()
         .setName("foo.proto").build();
@@ -624,7 +628,7 @@ public class DescriptorsTest extends TestCase {
     Descriptors.FileDescriptor.buildFrom(
         fooProto, new FileDescriptor[] {forwardFile});
   }
-
+  
   /**
    * Tests the translate/crosslink for an example with a more complex namespace
    * referencing.
@@ -673,7 +677,7 @@ public class DescriptorsTest extends TestCase {
       assertTrue(field.getEnumType().getFile().getName().equals("bar.proto"));
       assertTrue(field.getEnumType().getFile().getPackage().equals(
           "a.b.c.d.bar.shared"));
-    }
+    }   
   }
 
   public void testOneofDescriptor() throws Exception {
@@ -700,12 +704,6 @@ public class DescriptorsTest extends TestCase {
     assertFalse(TestMultipleExtensionRanges.getDescriptor().isExtensionNumber(43));
     assertFalse(TestMultipleExtensionRanges.getDescriptor().isExtensionNumber(4142));
     assertTrue(TestMultipleExtensionRanges.getDescriptor().isExtensionNumber(4143));
-  }
-
-  public void testToString() {
-    assertEquals("protobuf_unittest.TestAllTypes.optional_uint64",
-        UnittestProto.TestAllTypes.getDescriptor().findFieldByNumber(
-            UnittestProto.TestAllTypes.OPTIONAL_UINT64_FIELD_NUMBER).toString());
   }
 
   public void testPackedEnumField() throws Exception {

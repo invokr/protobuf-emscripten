@@ -112,17 +112,15 @@ def PrintMessage(message, out, indent=0, as_utf8=False, as_one_line=False,
       for element in value:
         PrintField(field, element, out, indent, as_utf8, as_one_line,
                    pointy_brackets=pointy_brackets,
-                   use_index_order=use_index_order,
                    float_format=float_format)
     else:
       PrintField(field, value, out, indent, as_utf8, as_one_line,
                  pointy_brackets=pointy_brackets,
-                 use_index_order=use_index_order,
                  float_format=float_format)
 
 
 def PrintField(field, value, out, indent=0, as_utf8=False, as_one_line=False,
-               pointy_brackets=False, use_index_order=False, float_format=None):
+               pointy_brackets=False, float_format=None):
   """Print a single field name/value pair.  For repeated fields, the value
   should be a single element."""
 
@@ -150,7 +148,6 @@ def PrintField(field, value, out, indent=0, as_utf8=False, as_one_line=False,
 
   PrintFieldValue(field, value, out, indent, as_utf8, as_one_line,
                   pointy_brackets=pointy_brackets,
-                  use_index_order=use_index_order,
                   float_format=float_format)
   if as_one_line:
     out.write(' ')
@@ -160,7 +157,6 @@ def PrintField(field, value, out, indent=0, as_utf8=False, as_one_line=False,
 
 def PrintFieldValue(field, value, out, indent=0, as_utf8=False,
                     as_one_line=False, pointy_brackets=False,
-                    use_index_order=False,
                     float_format=None):
   """Print a single field value (not including name).  For repeated fields,
   the value should be a single element."""
@@ -177,14 +173,12 @@ def PrintFieldValue(field, value, out, indent=0, as_utf8=False,
       out.write(' %s ' % openb)
       PrintMessage(value, out, indent, as_utf8, as_one_line,
                    pointy_brackets=pointy_brackets,
-                   use_index_order=use_index_order,
                    float_format=float_format)
       out.write(closeb)
     else:
       out.write(' %s\n' % openb)
       PrintMessage(value, out, indent + 2, as_utf8, as_one_line,
                    pointy_brackets=pointy_brackets,
-                   use_index_order=use_index_order,
                    float_format=float_format)
       out.write(' ' * indent + closeb)
   elif field.cpp_type == descriptor.FieldDescriptor.CPPTYPE_ENUM:
@@ -215,6 +209,24 @@ def PrintFieldValue(field, value, out, indent=0, as_utf8=False,
     out.write('{1:{0}}'.format(float_format, value))
   else:
     out.write(str(value))
+
+
+def _ParseOrMerge(lines, message, allow_multiple_scalars):
+  """Converts an ASCII representation of a protocol message into a message.
+
+  Args:
+    lines: Lines of a message's ASCII representation.
+    message: A protocol buffer message to merge into.
+    allow_multiple_scalars: Determines if repeated values for a non-repeated
+      field are permitted, e.g., the string "foo: 1 foo: 2" for a
+      required/optional field named "foo".
+
+  Raises:
+    ParseError: On ASCII parsing problems.
+  """
+  tokenizer = _Tokenizer(lines)
+  while not tokenizer.AtEnd():
+    _MergeField(tokenizer, message, allow_multiple_scalars)
 
 
 def Parse(text, message):
@@ -287,24 +299,6 @@ def MergeLines(lines, message):
   return message
 
 
-def _ParseOrMerge(lines, message, allow_multiple_scalars):
-  """Converts an ASCII representation of a protocol message into a message.
-
-  Args:
-    lines: Lines of a message's ASCII representation.
-    message: A protocol buffer message to merge into.
-    allow_multiple_scalars: Determines if repeated values for a non-repeated
-      field are permitted, e.g., the string "foo: 1 foo: 2" for a
-      required/optional field named "foo".
-
-  Raises:
-    ParseError: On ASCII parsing problems.
-  """
-  tokenizer = _Tokenizer(lines)
-  while not tokenizer.AtEnd():
-    _MergeField(tokenizer, message, allow_multiple_scalars)
-
-
 def _MergeField(tokenizer, message, allow_multiple_scalars):
   """Merges a single protocol message field into a message.
 
@@ -319,11 +313,6 @@ def _MergeField(tokenizer, message, allow_multiple_scalars):
     ParseError: In case of ASCII parsing problems.
   """
   message_descriptor = message.DESCRIPTOR
-  if (hasattr(message_descriptor, 'syntax') and
-      message_descriptor.syntax == 'proto3'):
-    # Proto3 doesn't represent presence so we can't test if multiple
-    # scalars have occurred.  We have to allow them.
-    allow_multiple_scalars = True
   if tokenizer.TryConsume('['):
     name = [tokenizer.ConsumeIdentifier()]
     while tokenizer.TryConsume('.'):
@@ -704,7 +693,7 @@ class _Tokenizer(object):
     """
     text = self.token
     if len(text) < 1 or text[0] not in ('\'', '"'):
-      raise self._ParseError('Expected string but found: "%r"' % text)
+      raise self._ParseError('Expected string.')
 
     if len(text) < 2 or text[-1] != text[0]:
       raise self._ParseError('String missing ending quote.')

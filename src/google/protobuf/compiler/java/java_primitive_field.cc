@@ -55,6 +55,26 @@ using internal::WireFormatLite;
 
 namespace {
 
+const char* PrimitiveTypeName(JavaType type) {
+  switch (type) {
+    case JAVATYPE_INT    : return "int";
+    case JAVATYPE_LONG   : return "long";
+    case JAVATYPE_FLOAT  : return "float";
+    case JAVATYPE_DOUBLE : return "double";
+    case JAVATYPE_BOOLEAN: return "boolean";
+    case JAVATYPE_STRING : return "java.lang.String";
+    case JAVATYPE_BYTES  : return "com.google.protobuf.ByteString";
+    case JAVATYPE_ENUM   : return NULL;
+    case JAVATYPE_MESSAGE: return NULL;
+
+    // No default because we want the compiler to complain if any new
+    // JavaTypes are added.
+  }
+
+  GOOGLE_LOG(FATAL) << "Can't get here.";
+  return NULL;
+}
+
 void SetPrimitiveVariables(const FieldDescriptor* descriptor,
                            int messageBitIndex,
                            int builderBitIndex,
@@ -772,9 +792,6 @@ GenerateParsingDoneCode(io::Printer* printer) const {
 void RepeatedImmutablePrimitiveFieldGenerator::
 GenerateSerializationCode(io::Printer* printer) const {
   if (descriptor_->options().packed()) {
-    // We invoke getSerializedSize in writeTo for messages that have packed
-    // fields in ImmutableMessageGenerator::GenerateMessageSerializationMethods.
-    // That makes it safe to rely on the memoized size here.
     printer->Print(variables_,
       "if (get$capitalized_name$List().size() > 0) {\n"
       "  output.writeRawVarint32($tag$);\n"

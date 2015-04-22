@@ -62,15 +62,6 @@ namespace google {
 namespace protobuf {
 namespace internal {
 
-#if defined(GOOGLE_PROTOBUF_ARCH_POWER)
-#if defined(_LP64) || defined(__LP64__)
-typedef int32 Atomic32;
-typedef intptr_t Atomic64;
-#else
-typedef intptr_t Atomic32;
-typedef int64 Atomic64;
-#endif
-#else
 typedef int32 Atomic32;
 #ifdef GOOGLE_PROTOBUF_ARCH_64_BIT
 // We need to be able to go between Atomic64 and AtomicWord implicitly.  This
@@ -82,7 +73,6 @@ typedef int32 Atomic32;
 typedef int64 Atomic64;
 #else
 typedef intptr_t Atomic64;
-#endif
 #endif
 #endif
 
@@ -175,9 +165,7 @@ Atomic64 Release_Load(volatile const Atomic64* ptr);
 #error "Atomic operations are not supported on your platform"
 
 // ThreadSanitizer, http://clang.llvm.org/docs/ThreadSanitizer.html.
-#if defined(EMSCRIPTEN)
-#include <google/protobuf/stubs/atomicops_internals_emscripten.h>
-#elif defined(THREAD_SANITIZER)
+#if defined(THREAD_SANITIZER)
 #include <google/protobuf/stubs/atomicops_internals_tsan.h>
 // MSVC.
 #elif defined(_MSC_VER)
@@ -190,10 +178,6 @@ GOOGLE_PROTOBUF_ATOMICOPS_ERROR
 // Solaris
 #elif defined(GOOGLE_PROTOBUF_OS_SOLARIS)
 #include <google/protobuf/stubs/atomicops_internals_solaris.h>
-
-// AIX
-#elif defined(GOOGLE_PROTOBUF_OS_AIX)
-#include <google/protobuf/stubs/atomicops_internals_aix.h>
 
 // Apple.
 #elif defined(GOOGLE_PROTOBUF_OS_APPLE)

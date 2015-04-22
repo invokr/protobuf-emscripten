@@ -18,7 +18,7 @@
 		<Configuration
 			Name="Debug|Win32"
 			OutputDirectory="Debug"
-			IntermediateDirectory="$(OutDir)\$(ProjectName)"
+			IntermediateDirectory="Debug"
 			ConfigurationType="4"
 			>
 			<Tool
@@ -81,7 +81,7 @@
 		<Configuration
 			Name="Release|Win32"
 			OutputDirectory="Release"
-			IntermediateDirectory="$(OutDir)\$(ProjectName)"
+			IntermediateDirectory="Release"
 			ConfigurationType="4"
 			>
 			<Tool
@@ -164,10 +164,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\google\protobuf\stubs\pbconfig.h"
-				>
-			</File>
-			<File
 				RelativePath="..\src\google\protobuf\descriptor.h"
 				>
 			</File>
@@ -223,9 +219,6 @@
 				RelativePath="..\src\google\protobuf\message_lite.h"
 				>
 			</File>
-			<File RelativePath="..\src\google\protobuf\generated_enum_util.h"></File>
-			<File RelativePath="..\src\google\protobuf\map_entry_lite.h"></File>
-			<File RelativePath="..\src\google\protobuf\map_field_lite.h"></File>
 			<File
 				RelativePath="..\src\google\protobuf\stubs\atomicops.h"
 			>
@@ -335,11 +328,7 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath="..\src\google\protobuf\stubs\atomicops_internals_x86_gcc.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\stubs\atomicops_internals_x86_msvc.cc"
+				RelativePath="..\src\google\protobuf\io\coded_stream.cc"
 				>
 			</File>
 			<File
@@ -347,83 +336,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\src\google\protobuf\stubs\once.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\stubs\stringprintf.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\arena.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\arenastring.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\extension_set.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\generated_message_util.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\map_field.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\message_lite.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\repeated_field.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\wire_format_lite.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\io\coded_stream.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\io\zero_copy_stream.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\io\zero_copy_stream_impl_lite.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\stubs\strutil.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\stubs\strutil.h"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\stubs\substitute.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\stubs\substitute.h"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\stubs\structurally_valid.cc"
-				>
-			</File>
-			<File
 				RelativePath="..\src\google\protobuf\descriptor.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\descriptor_database.cc"
 				>
 			</File>
 			<File
@@ -431,7 +344,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\src\google\protobuf\descriptor_database.cc"
+				>
+			</File>
+			<File
 				RelativePath="..\src\google\protobuf\dynamic_message.cc"
+				>
+			</File>
+			<File
+				RelativePath="..\src\google\protobuf\extension_set.cc"
 				>
 			</File>
 			<File
@@ -443,11 +364,43 @@
 				>
 			</File>
 			<File
+				RelativePath="..\src\google\protobuf\generated_message_util.cc"
+				>
+			</File>
+			<File
+				RelativePath="..\src\google\protobuf\io\gzip_stream.cc"
+				>
+			</File>
+			<File
+			        RelativePath="..\src\google\protobuf\io\strtod.cc"
+				>
+			</File>
+			<File
+				RelativePath="..\src\google\protobuf\compiler\importer.cc"
+				>
+			</File>
+			<File
 				RelativePath="..\src\google\protobuf\message.cc"
 				>
 			</File>
 			<File
-				RelativePath="..\src\google\protobuf\reflection_internal.h"
+				RelativePath="..\src\google\protobuf\message_lite.cc"
+				>
+			</File>
+			<File
+				RelativePath="..\src\google\protobuf\stubs\once.cc"
+				>
+			</File>
+			<File
+				RelativePath="..\src\google\protobuf\stubs\atomicops_internals_x86_msvc.cc"
+				>
+			</File>
+			<File
+				RelativePath="..\src\google\protobuf\compiler\parser.cc"
+				>
+			</File>
+			<File
+				RelativePath="..\src\google\protobuf\io\printer.cc"
 				>
 			</File>
 			<File
@@ -455,11 +408,31 @@
 				>
 			</File>
 			<File
+				RelativePath="..\src\google\protobuf\repeated_field.cc"
+				>
+			</File>
+			<File
 				RelativePath="..\src\google\protobuf\service.cc"
 				>
 			</File>
 			<File
+				RelativePath="..\src\google\protobuf\stubs\structurally_valid.cc"
+				>
+			</File>
+			<File
+				RelativePath="..\src\google\protobuf\stubs\strutil.cc"
+				>
+			</File>
+			<File
+				RelativePath="..\src\google\protobuf\stubs\substitute.cc"
+				>
+			</File>
+			<File
 				RelativePath="..\src\google\protobuf\text_format.cc"
+				>
+			</File>
+			<File
+				RelativePath="..\src\google\protobuf\io\tokenizer.cc"
 				>
 			</File>
 			<File
@@ -471,19 +444,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\src\google\protobuf\io\gzip_stream.cc"
+				RelativePath="..\src\google\protobuf\wire_format_lite.cc"
 				>
 			</File>
 			<File
-				RelativePath="..\src\google\protobuf\io\printer.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\io\strtod.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\io\tokenizer.cc"
+				RelativePath="..\src\google\protobuf\io\zero_copy_stream.cc"
 				>
 			</File>
 			<File
@@ -491,11 +456,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\src\google\protobuf\compiler\importer.cc"
+				RelativePath="..\src\google\protobuf\io\zero_copy_stream_impl_lite.cc"
 				>
 			</File>
 			<File
-				RelativePath="..\src\google\protobuf\compiler\parser.cc"
+				RelativePath="..\src\google\protobuf\stubs\stringprintf.cc"
 				>
 			</File>
 		</Filter>

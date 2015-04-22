@@ -30,13 +30,7 @@
 
 package com.google.protobuf;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.io.UnsupportedEncodingException;
-
 
 /**
  * This class tests {@link BoundedByteString}, which extends {@link LiteralByteString},
@@ -62,7 +56,7 @@ public class BoundedByteStringTest extends LiteralByteStringTest {
   @Override
   public void testToString() throws UnsupportedEncodingException {
     String testString = "I love unicode \u1234\u5678 characters";
-    LiteralByteString unicode = new LiteralByteString(testString.getBytes(Internal.UTF_8));
+    LiteralByteString unicode = new LiteralByteString(testString.getBytes(UTF_8));
     ByteString chopped = unicode.substring(2, unicode.size() - 6);
     assertEquals(classUnderTest + ".substring() must have the expected type",
         classUnderTest, getActualClassName(chopped));
@@ -70,31 +64,5 @@ public class BoundedByteStringTest extends LiteralByteStringTest {
     String roundTripString = chopped.toString(UTF_8);
     assertEquals(classUnderTest + " unicode bytes must match",
         testString.substring(2, testString.length() - 6), roundTripString);
-  }
-
-  @Override
-  public void testCharsetToString() throws UnsupportedEncodingException {
-    String testString = "I love unicode \u1234\u5678 characters";
-    LiteralByteString unicode = new LiteralByteString(testString.getBytes(Internal.UTF_8));
-    ByteString chopped = unicode.substring(2, unicode.size() - 6);
-    assertEquals(classUnderTest + ".substring() must have the expected type",
-        classUnderTest, getActualClassName(chopped));
-
-    String roundTripString = chopped.toString(Internal.UTF_8);
-    assertEquals(classUnderTest + " unicode bytes must match",
-        testString.substring(2, testString.length() - 6), roundTripString);
-  }
-
-  public void testJavaSerialization() throws Exception {
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
-    ObjectOutputStream oos = new ObjectOutputStream(out);
-    oos.writeObject(stringUnderTest);
-    oos.close();
-    byte[] pickled = out.toByteArray();
-    InputStream in = new ByteArrayInputStream(pickled);
-    ObjectInputStream ois = new ObjectInputStream(in);
-    Object o = ois.readObject();
-    assertTrue("Didn't get a ByteString back", o instanceof ByteString);
-    assertEquals("Should get an equal ByteString back", stringUnderTest, o);
   }
 }

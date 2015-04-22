@@ -1,8 +1,6 @@
 Protocol Buffers - Google's data interchange format
 ===================================================
 
-[![Build Status](https://travis-ci.org/google/protobuf.svg?branch=master)](https://travis-ci.org/google/protobuf)
-
 Copyright 2008 Google Inc.
 
 https://developers.google.com/protocol-buffers/
@@ -88,22 +86,6 @@ For advanced usage information on configure and make, see INSTALL.txt.
   If you only want protobuf-lite, substitute "protobuf-lite" in place
   of "protobuf" in these examples.
 
-**Note for Mac users**
-
-  For a Mac system, Unix tools are not available by default. You will first need
-  to install Xcode from the Mac AppStore and then run the following command from
-  a terminal:
-
-    $ sudo xcode-select --install
-
-  To install Unix tools, you can install "port" following the instructions at
-  https://www.macports.org . This will reside in /opt/local/bin/port for most
-  Mac installations.
-
-    $ sudo /opt/local/bin/port install autoconf automake libtool
-
-  Then follow the Unix instructions above.
-
 **Note for cross-compiling**
 
   The makefiles normally invoke the protoc executable that they just
@@ -144,14 +126,6 @@ For advanced usage information on configure and make, see INSTALL.txt.
     ./configure CXXFLAGS="-O -std ansi -ieee -D__USE_STD_IOSTREAM"
 
   Also, you will need to use gmake instead of make.
-
-**Note for AIX users**
-
-  Compile using the IBM xlC C++ compiler as follows:
-
-    ./configure CXX=xlC
-
-  Also, you will need to use GNU `make` (`gmake`) instead of AIX `make`.
 
 C++ Installation - Windows
 --------------------------

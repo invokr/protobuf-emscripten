@@ -51,7 +51,6 @@
 namespace google {
 
 namespace protobuf {
-  class Arena;
   class Descriptor;                                    // descriptor.h
   class FieldDescriptor;                               // descriptor.h
   class DescriptorPool;                                // descriptor.h
@@ -158,7 +157,6 @@ class MessageSetFieldSkipper;
 class LIBPROTOBUF_EXPORT ExtensionSet {
  public:
   ExtensionSet();
-  explicit ExtensionSet(::google::protobuf::Arena* arena);
   ~ExtensionSet();
 
   // These are called at startup by protocol-compiler-generated code to
@@ -184,7 +182,7 @@ class LIBPROTOBUF_EXPORT ExtensionSet {
   // is useful to implement Reflection::ListFields().
   void AppendToList(const Descriptor* containing_type,
                     const DescriptorPool* pool,
-                    std::vector<const FieldDescriptor*>* output) const;
+                    vector<const FieldDescriptor*>* output) const;
 
   // =================================================================
   // Accessors
@@ -263,13 +261,9 @@ class LIBPROTOBUF_EXPORT ExtensionSet {
                            const FieldDescriptor* descriptor,
                            MessageLite* message);
   MessageLite* ReleaseMessage(int number, const MessageLite& prototype);
-  MessageLite* UnsafeArenaReleaseMessage(
-      int number, const MessageLite& prototype);
-
   MessageLite* ReleaseMessage(const FieldDescriptor* descriptor,
                               MessageFactory* factory);
 #undef desc
-  ::google::protobuf::Arena* GetArenaNoVirtual() const { return arena_; }
 
   // repeated fields -------------------------------------------------
 
@@ -427,14 +421,12 @@ class LIBPROTOBUF_EXPORT ExtensionSet {
     LazyMessageExtension() {}
     virtual ~LazyMessageExtension() {}
 
-    virtual LazyMessageExtension* New(::google::protobuf::Arena* arena) const = 0;
+    virtual LazyMessageExtension* New() const = 0;
     virtual const MessageLite& GetMessage(
         const MessageLite& prototype) const = 0;
     virtual MessageLite* MutableMessage(const MessageLite& prototype) = 0;
     virtual void SetAllocatedMessage(MessageLite *message) = 0;
     virtual MessageLite* ReleaseMessage(const MessageLite& prototype) = 0;
-    virtual MessageLite* UnsafeArenaReleaseMessage(
-        const MessageLite& prototype) = 0;
 
     virtual bool IsInitialized() const = 0;
     virtual int ByteSize() const = 0;
@@ -532,9 +524,6 @@ class LIBPROTOBUF_EXPORT ExtensionSet {
   };
 
 
-  // Merges existing Extension from other_extension
-  void InternalExtensionMergeFrom(int number, const Extension& other_extension);
-
   // Returns true and fills field_number and extension if extension is found.
   // Note to support packed repeated field compatibility, it also fills whether
   // the tag on wire is packed, which can be different from
@@ -580,6 +569,7 @@ class LIBPROTOBUF_EXPORT ExtensionSet {
                            ExtensionFinder* extension_finder,
                            MessageSetFieldSkipper* field_skipper);
 
+
   // Hack:  RepeatedPtrFieldBase declares ExtensionSet as a friend.  This
   //   friendship should automatically extend to ExtensionSet::Extension, but
   //   unfortunately some older compilers (e.g. GCC 3.4.4) do not implement this
@@ -597,7 +587,7 @@ class LIBPROTOBUF_EXPORT ExtensionSet {
   // for 100 elements or more.  Also, we want AppendToList() to order fields
   // by field number.
   std::map<int, Extension> extensions_;
-  ::google::protobuf::Arena* arena_;
+
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(ExtensionSet);
 };
 

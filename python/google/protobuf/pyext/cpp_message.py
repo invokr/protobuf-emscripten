@@ -53,5 +53,9 @@ def NewMessage(bases, message_descriptor, dictionary):
 
 
 def InitMessage(message_descriptor, cls):
-  """Finalizes the creation of a message class."""
+  """Constructs a new message instance (called before instance's __init__)."""
+
+  def SubInit(self, **kwargs):
+    super(cls, self).__init__(message_descriptor, **kwargs)
+  cls.__init__ = SubInit
   cls.AddDescriptors(message_descriptor)

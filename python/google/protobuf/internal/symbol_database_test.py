@@ -32,13 +32,12 @@
 
 """Tests for google.protobuf.symbol_database."""
 
-import unittest
-
+from google.apputils import basetest
 from google.protobuf import unittest_pb2
 from google.protobuf import symbol_database
 
 
-class SymbolDatabaseTest(unittest.TestCase):
+class SymbolDatabaseTest(basetest.TestCase):
 
   def _Database(self):
     db = symbol_database.SymbolDatabase()
@@ -118,4 +117,4 @@ class SymbolDatabaseTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
-  unittest.main()
+  basetest.main()

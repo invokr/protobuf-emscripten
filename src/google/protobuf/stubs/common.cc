@@ -44,7 +44,6 @@
 #define snprintf _snprintf    // see comment in strutil.cc
 #elif defined(HAVE_PTHREAD)
 #include <pthread.h>
-#elif defined(EMSCRIPTEN)
 #else
 #error "No suitable threading library available."
 #endif
@@ -172,7 +171,6 @@ DECLARE_STREAM_OPERATOR(uint         , "%u" )
 DECLARE_STREAM_OPERATOR(long         , "%ld")
 DECLARE_STREAM_OPERATOR(unsigned long, "%lu")
 DECLARE_STREAM_OPERATOR(double       , "%g" )
-DECLARE_STREAM_OPERATOR(void*        , "%p" )
 #undef DECLARE_STREAM_OPERATOR
 
 LogMessage::LogMessage(LogLevel level, const char* filename, int line)
@@ -282,27 +280,6 @@ void Mutex::AssertHeld() {
 #ifndef NDEBUG
   GOOGLE_DCHECK_EQ(mInternal->thread_id, GetCurrentThreadId());
 #endif
-}
-
-#elif defined(EMSCRIPTEN)
-
-struct Mutex::Internal {
-};
-
-Mutex::Mutex()
-  : mInternal(new Internal) {
-}
-
-Mutex::~Mutex() {
-}
-
-void Mutex::Lock() {
-}
-
-void Mutex::Unlock() {
-}
-
-void Mutex::AssertHeld() {
 }
 
 #elif defined(HAVE_PTHREAD)

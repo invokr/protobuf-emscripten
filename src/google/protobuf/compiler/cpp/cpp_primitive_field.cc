@@ -117,21 +117,19 @@ GeneratePrivateMembers(io::Printer* printer) const {
 void PrimitiveFieldGenerator::
 GenerateAccessorDeclarations(io::Printer* printer) const {
   printer->Print(variables_,
-    "$type$ $name$() const$deprecation$;\n"
-    "void set_$name$($type$ value)$deprecation$;\n");
+    "inline $type$ $name$() const$deprecation$;\n"
+    "inline void set_$name$($type$ value)$deprecation$;\n");
 }
 
 void PrimitiveFieldGenerator::
-GenerateInlineAccessorDefinitions(io::Printer* printer, bool is_inline) const {
-  map<string, string> variables(variables_);
-  variables["inline"] = is_inline ? "inline" : "";
-  printer->Print(variables,
-    "$inline$ $type$ $classname$::$name$() const {\n"
+GenerateInlineAccessorDefinitions(io::Printer* printer) const {
+  printer->Print(variables_,
+    "inline $type$ $classname$::$name$() const {\n"
     "  // @@protoc_insertion_point(field_get:$full_name$)\n"
     "  return $name$_;\n"
     "}\n"
-    "$inline$ void $classname$::set_$name$($type$ value) {\n"
-    "  $set_hasbit$\n"
+    "inline void $classname$::set_$name$($type$ value) {\n"
+    "  set_has_$name$();\n"
     "  $name$_ = value;\n"
     "  // @@protoc_insertion_point(field_set:$full_name$)\n"
     "}\n");
@@ -163,7 +161,7 @@ GenerateMergeFromCodedStream(io::Printer* printer) const {
     "DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<\n"
     "         $type$, $wire_format_field_type$>(\n"
     "       input, &$name$_)));\n"
-    "$set_hasbit$\n");
+    "set_has_$name$();\n");
 }
 
 void PrimitiveFieldGenerator::
@@ -206,24 +204,20 @@ PrimitiveOneofFieldGenerator(const FieldDescriptor* descriptor,
 PrimitiveOneofFieldGenerator::~PrimitiveOneofFieldGenerator() {}
 
 void PrimitiveOneofFieldGenerator::
-GenerateInlineAccessorDefinitions(io::Printer* printer, bool is_inline) const {
-  map<string, string> variables(variables_);
-  variables["inline"] = is_inline ? "inline" : "";
-  printer->Print(variables,
-    "$inline$ $type$ $classname$::$name$() const {\n"
-    "  // @@protoc_insertion_point(field_get:$full_name$)\n"
+GenerateInlineAccessorDefinitions(io::Printer* printer) const {
+  printer->Print(variables_,
+    "inline $type$ $classname$::$name$() const {\n"
     "  if (has_$name$()) {\n"
     "    return $oneof_prefix$$name$_;\n"
     "  }\n"
     "  return $default$;\n"
     "}\n"
-    "$inline$ void $classname$::set_$name$($type$ value) {\n"
+    "inline void $classname$::set_$name$($type$ value) {\n"
     "  if (!has_$name$()) {\n"
     "    clear_$oneof_name$();\n"
     "    set_has_$name$();\n"
     "  }\n"
     "  $oneof_prefix$$name$_ = value;\n"
-    "  // @@protoc_insertion_point(field_set:$full_name$)\n"
     "}\n");
 }
 
@@ -286,40 +280,38 @@ GeneratePrivateMembers(io::Printer* printer) const {
 void RepeatedPrimitiveFieldGenerator::
 GenerateAccessorDeclarations(io::Printer* printer) const {
   printer->Print(variables_,
-    "$type$ $name$(int index) const$deprecation$;\n"
-    "void set_$name$(int index, $type$ value)$deprecation$;\n"
-    "void add_$name$($type$ value)$deprecation$;\n");
+    "inline $type$ $name$(int index) const$deprecation$;\n"
+    "inline void set_$name$(int index, $type$ value)$deprecation$;\n"
+    "inline void add_$name$($type$ value)$deprecation$;\n");
   printer->Print(variables_,
-    "const ::google::protobuf::RepeatedField< $type$ >&\n"
+    "inline const ::google::protobuf::RepeatedField< $type$ >&\n"
     "    $name$() const$deprecation$;\n"
-    "::google::protobuf::RepeatedField< $type$ >*\n"
+    "inline ::google::protobuf::RepeatedField< $type$ >*\n"
     "    mutable_$name$()$deprecation$;\n");
 }
 
 void RepeatedPrimitiveFieldGenerator::
-GenerateInlineAccessorDefinitions(io::Printer* printer, bool is_inline) const {
-  map<string, string> variables(variables_);
-  variables["inline"] = is_inline ? "inline" : "";
-  printer->Print(variables,
-    "$inline$ $type$ $classname$::$name$(int index) const {\n"
+GenerateInlineAccessorDefinitions(io::Printer* printer) const {
+  printer->Print(variables_,
+    "inline $type$ $classname$::$name$(int index) const {\n"
     "  // @@protoc_insertion_point(field_get:$full_name$)\n"
     "  return $name$_.Get(index);\n"
     "}\n"
-    "$inline$ void $classname$::set_$name$(int index, $type$ value) {\n"
+    "inline void $classname$::set_$name$(int index, $type$ value) {\n"
     "  $name$_.Set(index, value);\n"
     "  // @@protoc_insertion_point(field_set:$full_name$)\n"
     "}\n"
-    "$inline$ void $classname$::add_$name$($type$ value) {\n"
+    "inline void $classname$::add_$name$($type$ value) {\n"
     "  $name$_.Add(value);\n"
     "  // @@protoc_insertion_point(field_add:$full_name$)\n"
     "}\n");
-  printer->Print(variables,
-    "$inline$ const ::google::protobuf::RepeatedField< $type$ >&\n"
+  printer->Print(variables_,
+    "inline const ::google::protobuf::RepeatedField< $type$ >&\n"
     "$classname$::$name$() const {\n"
     "  // @@protoc_insertion_point(field_list:$full_name$)\n"
     "  return $name$_;\n"
     "}\n"
-    "$inline$ ::google::protobuf::RepeatedField< $type$ >*\n"
+    "inline ::google::protobuf::RepeatedField< $type$ >*\n"
     "$classname$::mutable_$name$() {\n"
     "  // @@protoc_insertion_point(field_mutable_list:$full_name$)\n"
     "  return &$name$_;\n"
@@ -338,7 +330,7 @@ GenerateMergingCode(io::Printer* printer) const {
 
 void RepeatedPrimitiveFieldGenerator::
 GenerateSwappingCode(io::Printer* printer) const {
-  printer->Print(variables_, "$name$_.UnsafeArenaSwap(&other->$name$_);\n");
+  printer->Print(variables_, "$name$_.Swap(&other->$name$_);\n");
 }
 
 void RepeatedPrimitiveFieldGenerator::

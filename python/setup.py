@@ -20,12 +20,7 @@ except ImportError:
         "ez_setup installed.\n")
     raise
 from distutils.command.clean import clean as _clean
-if sys.version_info[0] >= 3:
-    # Python 3
-    from distutils.command.build_py import build_py_2to3 as _build_py
-else:
-    # Python 2
-    from distutils.command.build_py import build_py as _build_py
+from distutils.command.build_py import build_py as _build_py
 from distutils.spawn import find_executable
 
 maintainer_email = "protobuf@googlegroups.com"
@@ -43,18 +38,6 @@ elif os.path.exists("../vsprojects/Release/protoc.exe"):
   protoc = "../vsprojects/Release/protoc.exe"
 else:
   protoc = find_executable("protoc")
-
-def GetVersion():
-  """Gets the version from google/protobuf/__init__.py
-
-  Do not import google.protobuf.__init__ directly, because an installed protobuf
-  library may be loaded instead.
-
-  """
-  with open(os.path.join('google', 'protobuf', '__init__.py')) as version_file:
-    exec(version_file.read())
-    return __version__
-
 
 def generate_proto(source):
   """Invokes the Protocol Compiler to generate a _pb2.py from the given
@@ -89,7 +72,6 @@ def GenerateUnittestProtos():
   generate_proto("../src/google/protobuf/unittest_import_public.proto")
   generate_proto("../src/google/protobuf/unittest_mset.proto")
   generate_proto("../src/google/protobuf/unittest_no_generic_services.proto")
-  generate_proto("../src/google/protobuf/unittest_proto3_arena.proto")
   generate_proto("google/protobuf/internal/descriptor_pool_test1.proto")
   generate_proto("google/protobuf/internal/descriptor_pool_test2.proto")
   generate_proto("google/protobuf/internal/test_bad_identifiers.proto")
@@ -99,9 +81,24 @@ def GenerateUnittestProtos():
   generate_proto("google/protobuf/internal/more_messages.proto")
   generate_proto("google/protobuf/internal/factory_test1.proto")
   generate_proto("google/protobuf/internal/factory_test2.proto")
-  generate_proto("google/protobuf/internal/import_test_package/inner.proto")
-  generate_proto("google/protobuf/internal/import_test_package/outer.proto")
   generate_proto("google/protobuf/pyext/python.proto")
+
+def MakeTestSuite():
+  # Test C++ implementation
+  import unittest
+  import google.protobuf.pyext.descriptor_cpp2_test as descriptor_cpp2_test
+  import google.protobuf.pyext.message_factory_cpp2_test \
+      as message_factory_cpp2_test
+  import google.protobuf.pyext.reflection_cpp2_generated_test \
+      as reflection_cpp2_generated_test
+
+  loader = unittest.defaultTestLoader
+  suite = unittest.TestSuite()
+  for test in [  descriptor_cpp2_test,
+                 message_factory_cpp2_test,
+                 reflection_cpp2_generated_test]:
+    suite.addTest(loader.loadTestsFromModule(test))
+  return suite
 
 class clean(_clean):
   def run(self):
@@ -148,28 +145,27 @@ if __name__ == '__main__':
     ext_module_list.append(Extension(
         "google.protobuf.pyext._message",
         [ "google/protobuf/pyext/descriptor.cc",
-          "google/protobuf/pyext/descriptor_containers.cc",
-          "google/protobuf/pyext/descriptor_pool.cc",
           "google/protobuf/pyext/message.cc",
           "google/protobuf/pyext/extension_dict.cc",
           "google/protobuf/pyext/repeated_scalar_container.cc",
           "google/protobuf/pyext/repeated_composite_container.cc" ],
         define_macros=[('GOOGLE_PROTOBUF_HAS_ONEOF', '1')],
-        include_dirs = [ ".", "../src" ],
+        include_dirs = [ ".", "../src"],
         libraries = [ "protobuf" ],
         library_dirs = [ '../src/.libs' ],
         ))
-    os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'cpp'
 
   setup(name = 'protobuf',
-        version = GetVersion(),
+        version = '2.6.1',
         packages = [ 'google' ],
         namespace_packages = [ 'google' ],
-        test_suite = 'google.protobuf.internal',
+        test_suite = 'setup.MakeTestSuite',
+        google_test_dir = "google/protobuf/internal",
         # Must list modules explicitly so that we don't install tests.
         py_modules = [
           'google.protobuf.internal.api_implementation',
           'google.protobuf.internal.containers',
+          'google.protobuf.internal.cpp_message',
           'google.protobuf.internal.decoder',
           'google.protobuf.internal.encoder',
           'google.protobuf.internal.enum_type_wrapper',
@@ -184,7 +180,6 @@ if __name__ == '__main__':
           'google.protobuf.descriptor_database',
           'google.protobuf.descriptor_pool',
           'google.protobuf.message_factory',
-          'google.protobuf.proto_builder',
           'google.protobuf.pyext.cpp_message',
           'google.protobuf.reflection',
           'google.protobuf.service',
@@ -194,6 +189,7 @@ if __name__ == '__main__':
           'google.protobuf.text_format'],
         cmdclass = { 'clean': clean, 'build_py': build_py },
         install_requires = ['setuptools'],
+        setup_requires = ['google-apputils'],
         ext_modules = ext_module_list,
         url = 'https://developers.google.com/protocol-buffers/',
         maintainer = maintainer_email,

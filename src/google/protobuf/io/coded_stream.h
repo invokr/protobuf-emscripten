@@ -49,7 +49,7 @@
 //   // to identify the file type, then write a length-delimited string.  The
 //   // string is composed of a varint giving the length followed by the raw
 //   // bytes.
-//   int fd = open("myfile", O_CREAT | O_WRONLY);
+//   int fd = open("myfile", O_WRONLY);
 //   ZeroCopyOutputStream* raw_output = new FileOutputStream(fd);
 //   CodedOutputStream* coded_output = new CodedOutputStream(raw_output);
 //
@@ -110,7 +110,6 @@
 #define GOOGLE_PROTOBUF_IO_CODED_STREAM_H__
 
 #include <string>
-#include <utility>
 #ifdef _MSC_VER
   #if defined(_M_IX86) && \
       !defined(PROTOBUF_DISABLE_LITTLE_ENDIAN_OPT_FOR_TEST)
@@ -123,16 +122,15 @@
   #endif
 #else
   #include <sys/param.h>   // __BYTE_ORDER
-  #if ((defined(__LITTLE_ENDIAN__) && !defined(__BIG_ENDIAN__)) || \
-         (defined(__BYTE_ORDER) && __BYTE_ORDER == __LITTLE_ENDIAN)) && \
+  #if defined(__BYTE_ORDER) && __BYTE_ORDER == __LITTLE_ENDIAN && \
       !defined(PROTOBUF_DISABLE_LITTLE_ENDIAN_OPT_FOR_TEST)
     #define PROTOBUF_LITTLE_ENDIAN 1
   #endif
 #endif
 #include <google/protobuf/stubs/common.h>
 
-namespace google {
 
+namespace google {
 namespace protobuf {
 
 class DescriptorPool;
@@ -390,23 +388,6 @@ class LIBPROTOBUF_EXPORT CodedInputStream {
   // Decrements the recursion depth.
   void DecrementRecursionDepth();
 
-  // Shorthand for make_pair(PushLimit(byte_limit), --recursion_budget_).
-  // Using this can reduce code size and complexity in some cases.  The caller
-  // is expected to check that the second part of the result is non-negative (to
-  // bail out if the depth of recursion is too high) and, if all is well, to
-  // later pass the first part of the result to PopLimit() or similar.
-  std::pair<CodedInputStream::Limit, int> IncrementRecursionDepthAndPushLimit(
-      int byte_limit);
-
-  // Helper that is equivalent to: {
-  //  bool result = ConsumedEntireMessage();
-  //  PopLimit(limit);
-  //  DecrementRecursionDepth();
-  //  return result; }
-  // Using this can reduce code size and complexity in some cases.
-  // Do not use unless the current recursion depth is greater than zero.
-  bool DecrementRecursionDepthAndPopLimit(Limit limit);
-
   // Extension Registry ----------------------------------------------
   // ADVANCED USAGE:  99.9% of people can ignore this section.
   //
@@ -489,9 +470,9 @@ class LIBPROTOBUF_EXPORT CodedInputStream {
  private:
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(CodedInputStream);
 
+  ZeroCopyInputStream* input_;
   const uint8* buffer_;
   const uint8* buffer_end_;     // pointer to the end of the buffer.
-  ZeroCopyInputStream* input_;
   int total_bytes_read_;  // total bytes read from input_, including
                           // the current buffer
 
@@ -532,10 +513,9 @@ class LIBPROTOBUF_EXPORT CodedInputStream {
   // If -2: Internal: Limit has been reached, print full size when destructing.
   int total_bytes_warning_threshold_;
 
-  // Current recursion budget, controlled by IncrementRecursionDepth() and
-  // similar.  Starts at recursion_limit_ and goes down: if this reaches
-  // -1 we are over budget.
-  int recursion_budget_;
+  // Current recursion depth, controlled by IncrementRecursionDepth() and
+  // DecrementRecursionDepth().
+  int recursion_depth_;
   // Recursion depth limit, set by SetRecursionLimit().
   int recursion_limit_;
 
@@ -646,13 +626,6 @@ class LIBPROTOBUF_EXPORT CodedOutputStream {
   // Destroy the CodedOutputStream and position the underlying
   // ZeroCopyOutputStream immediately after the last byte written.
   ~CodedOutputStream();
-
-  // Trims any unused space in the underlying buffer so that its size matches
-  // the number of bytes written by this stream. The underlying buffer will
-  // automatically be trimmed when this stream is destroyed; this call is only
-  // necessary if the underlying buffer is accessed *before* the stream is
-  // destroyed.
-  void Trim();
 
   // Skips a number of bytes, leaving the bytes unmodified in the underlying
   // buffer.  Returns false if an underlying write error occurs.  This is
@@ -796,9 +769,7 @@ class LIBPROTOBUF_EXPORT CodedOutputStream {
   // ZeroCopyOutputStream supports it.
   void WriteAliasedRaw(const void* buffer, int size);
 
-  // If this write might cross the end of the buffer, we compose the bytes first
-  // then use WriteRaw().
-  void WriteVarint32SlowPath(uint32 value);
+  static uint8* WriteVarint32FallbackToArray(uint32 value, uint8* target);
 
   // Always-inlined versions of WriteVarint* functions so that code can be
   // reused, while still controlling size. For instance, WriteVarint32ToArray()
@@ -807,6 +778,8 @@ class LIBPROTOBUF_EXPORT CodedOutputStream {
   // WriteVarint32FallbackToArray.  Meanwhile, WriteVarint32() is already
   // out-of-line, so it should just invoke this directly to avoid any extra
   // function call overhead.
+  static uint8* WriteVarint32FallbackToArrayInline(
+      uint32 value, uint8* target) GOOGLE_ATTRIBUTE_ALWAYS_INLINE;
   static uint8* WriteVarint64ToArrayInline(
       uint64 value, uint8* target) GOOGLE_ATTRIBUTE_ALWAYS_INLINE;
 
@@ -926,7 +899,7 @@ inline std::pair<uint32, bool> CodedInputStream::ReadTagWithCutoff(
       const uint32 kMax1ByteVarint = 0x7f;
       uint32 tag = last_tag_ = buffer_[0];
       Advance(1);
-      return std::make_pair(tag, cutoff >= kMax1ByteVarint || tag <= cutoff);
+      return make_pair(tag, cutoff >= kMax1ByteVarint || tag <= cutoff);
     }
     // Other hot case: cutoff >= 0x80, buffer_ has at least two bytes available,
     // and tag is two bytes.  The latter is tested by bitwise-and-not of the
@@ -944,12 +917,12 @@ inline std::pair<uint32, bool> CodedInputStream::ReadTagWithCutoff(
       // so we don't have to check for tag == 0.  We may need to check whether
       // it exceeds cutoff.
       bool at_or_below_cutoff = cutoff >= kMax2ByteVarint || tag <= cutoff;
-      return std::make_pair(tag, at_or_below_cutoff);
+      return make_pair(tag, at_or_below_cutoff);
     }
   }
   // Slow path
   last_tag_ = ReadTagFallback();
-  return std::make_pair(last_tag_, static_cast<uint32>(last_tag_ - 1) < cutoff);
+  return make_pair(last_tag_, static_cast<uint32>(last_tag_ - 1) < cutoff);
 }
 
 inline bool CodedInputStream::LastTagWas(uint32 expected) {
@@ -1034,14 +1007,13 @@ inline uint8* CodedOutputStream::GetDirectBufferForNBytesAndAdvance(int size) {
 }
 
 inline uint8* CodedOutputStream::WriteVarint32ToArray(uint32 value,
-                                                      uint8* target) {
-  while (value >= 0x80) {
-    *target = static_cast<uint8>(value | 0x80);
-    value >>= 7;
-    ++target;
+                                                        uint8* target) {
+  if (value < 0x80) {
+    *target = value;
+    return target + 1;
+  } else {
+    return WriteVarint32FallbackToArray(value, target);
   }
-  *target = static_cast<uint8>(value);
-  return target + 1;
 }
 
 inline void CodedOutputStream::WriteVarint32SignExtended(int32 value) {
@@ -1094,26 +1066,22 @@ inline uint8* CodedOutputStream::WriteLittleEndian64ToArray(uint64 value,
   return target + sizeof(value);
 }
 
-inline void CodedOutputStream::WriteVarint32(uint32 value) {
-  if (buffer_size_ >= 5) {
-    // Fast path:  We have enough bytes left in the buffer to guarantee that
-    // this write won't cross the end, so we can skip the checks.
-    uint8* target = buffer_;
-    uint8* end = WriteVarint32ToArray(value, target);
-    int size = end - target;
-    Advance(size);
-  } else {
-    WriteVarint32SlowPath(value);
-  }
-}
-
 inline void CodedOutputStream::WriteTag(uint32 value) {
   WriteVarint32(value);
 }
 
 inline uint8* CodedOutputStream::WriteTagToArray(
     uint32 value, uint8* target) {
-  return WriteVarint32ToArray(value, target);
+  if (value < (1 << 7)) {
+    target[0] = value;
+    return target + 1;
+  } else if (value < (1 << 14)) {
+    target[0] = static_cast<uint8>(value | 0x80);
+    target[1] = static_cast<uint8>(value >> 7);
+    return target + 2;
+  } else {
+    return WriteVarint32FallbackToArray(value, target);
+  }
 }
 
 inline int CodedOutputStream::VarintSize32(uint32 value) {
@@ -1164,17 +1132,16 @@ inline void CodedOutputStream::Advance(int amount) {
 }
 
 inline void CodedInputStream::SetRecursionLimit(int limit) {
-  recursion_budget_ += limit - recursion_limit_;
   recursion_limit_ = limit;
 }
 
 inline bool CodedInputStream::IncrementRecursionDepth() {
-  --recursion_budget_;
-  return recursion_budget_ >= 0;
+  ++recursion_depth_;
+  return recursion_depth_ <= recursion_limit_;
 }
 
 inline void CodedInputStream::DecrementRecursionDepth() {
-  if (recursion_budget_ < recursion_limit_) ++recursion_budget_;
+  if (recursion_depth_ > 0) --recursion_depth_;
 }
 
 inline void CodedInputStream::SetExtensionRegistry(const DescriptorPool* pool,
@@ -1196,9 +1163,9 @@ inline int CodedInputStream::BufferSize() const {
 }
 
 inline CodedInputStream::CodedInputStream(ZeroCopyInputStream* input)
-  : buffer_(NULL),
+  : input_(input),
+    buffer_(NULL),
     buffer_end_(NULL),
-    input_(input),
     total_bytes_read_(0),
     overflow_bytes_(0),
     last_tag_(0),
@@ -1208,7 +1175,7 @@ inline CodedInputStream::CodedInputStream(ZeroCopyInputStream* input)
     buffer_size_after_limit_(0),
     total_bytes_limit_(kDefaultTotalBytesLimit),
     total_bytes_warning_threshold_(kDefaultTotalBytesWarningThreshold),
-    recursion_budget_(default_recursion_limit_),
+    recursion_depth_(0),
     recursion_limit_(default_recursion_limit_),
     extension_pool_(NULL),
     extension_factory_(NULL) {
@@ -1217,9 +1184,9 @@ inline CodedInputStream::CodedInputStream(ZeroCopyInputStream* input)
 }
 
 inline CodedInputStream::CodedInputStream(const uint8* buffer, int size)
-  : buffer_(buffer),
+  : input_(NULL),
+    buffer_(buffer),
     buffer_end_(buffer + size),
-    input_(NULL),
     total_bytes_read_(size),
     overflow_bytes_(0),
     last_tag_(0),
@@ -1229,7 +1196,7 @@ inline CodedInputStream::CodedInputStream(const uint8* buffer, int size)
     buffer_size_after_limit_(0),
     total_bytes_limit_(kDefaultTotalBytesLimit),
     total_bytes_warning_threshold_(kDefaultTotalBytesWarningThreshold),
-    recursion_budget_(default_recursion_limit_),
+    recursion_depth_(0),
     recursion_limit_(default_recursion_limit_),
     extension_pool_(NULL),
     extension_factory_(NULL) {

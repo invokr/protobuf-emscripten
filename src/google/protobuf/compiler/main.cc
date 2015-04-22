@@ -34,8 +34,7 @@
 #include <google/protobuf/compiler/cpp/cpp_generator.h>
 #include <google/protobuf/compiler/python/python_generator.h>
 #include <google/protobuf/compiler/java/java_generator.h>
-#include <google/protobuf/compiler/javanano/javanano_generator.h>
-#include <google/protobuf/compiler/ruby/ruby_generator.h>
+
 
 int main(int argc, char* argv[]) {
 
@@ -57,16 +56,6 @@ int main(int argc, char* argv[]) {
   google::protobuf::compiler::python::Generator py_generator;
   cli.RegisterGenerator("--python_out", &py_generator,
                         "Generate Python source file.");
-
-  // Java Nano
-  google::protobuf::compiler::javanano::JavaNanoGenerator javanano_generator;
-  cli.RegisterGenerator("--javanano_out", &javanano_generator,
-                        "Generate Java Nano source file.");
-
-  // Ruby
-  google::protobuf::compiler::ruby::Generator rb_generator;
-  cli.RegisterGenerator("--ruby_out", &rb_generator,
-                        "Generate Ruby source file.");
 
   return cli.Run(argc, argv);
 }

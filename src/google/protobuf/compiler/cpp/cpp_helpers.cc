@@ -60,17 +60,16 @@ string DotsToColons(const string& name) {
 }
 
 const char* const kKeywordList[] = {
-  "alignas", "alignof", "and", "and_eq", "asm", "auto", "bitand", "bitor",
-  "bool", "break", "case", "catch", "char", "class", "compl", "const",
-  "constexpr", "const_cast", "continue", "decltype", "default", "delete", "do",
-  "double", "dynamic_cast", "else", "enum", "explicit", "extern", "false",
-  "float", "for", "friend", "goto", "if", "inline", "int", "long", "mutable",
-  "namespace", "new", "noexcept", "not", "not_eq", "nullptr", "operator", "or",
-  "or_eq", "private", "protected", "public", "register", "reinterpret_cast",
-  "return", "short", "signed", "sizeof", "static", "static_assert",
-  "static_cast", "struct", "switch", "template", "this", "thread_local",
-  "throw", "true", "try", "typedef", "typeid", "typename", "union", "unsigned",
-  "using", "virtual", "void", "volatile", "wchar_t", "while", "xor", "xor_eq"
+  "and", "and_eq", "asm", "auto", "bitand", "bitor", "bool", "break", "case",
+  "catch", "char", "class", "compl", "const", "const_cast", "continue",
+  "default", "delete", "do", "double", "dynamic_cast", "else", "enum",
+  "explicit", "extern", "false", "float", "for", "friend", "goto", "if",
+  "inline", "int", "long", "mutable", "namespace", "new", "not", "not_eq",
+  "operator", "or", "or_eq", "private", "protected", "public", "register",
+  "reinterpret_cast", "return", "short", "signed", "sizeof", "static",
+  "static_cast", "struct", "switch", "template", "this", "throw", "true", "try",
+  "typedef", "typeid", "typename", "union", "unsigned", "using", "virtual",
+  "void", "volatile", "wchar_t", "while", "xor", "xor_eq"
 };
 
 hash_set<string> MakeKeywordsMap() {
@@ -170,14 +169,6 @@ string SuperClassName(const Descriptor* descriptor) {
 string FieldName(const FieldDescriptor* field) {
   string result = field->name();
   LowerString(&result);
-  if (kKeywords.count(result) > 0) {
-    result.append("_");
-  }
-  return result;
-}
-
-string EnumValueName(const EnumValueDescriptor* enum_value) {
-  string result = enum_value->name();
   if (kKeywords.count(result) > 0) {
     result.append("_");
   }
@@ -360,7 +351,9 @@ string FilenameIdentifier(const string& filename) {
     } else {
       // Not alphanumeric.  To avoid any possibility of name conflicts we
       // use the hex code for the character.
-      StrAppend(&result, "_", ToHex(static_cast<uint8>(filename[i])));
+      result.push_back('_');
+      char buffer[kFastToBufferSize];
+      result.append(FastHexToBuffer(static_cast<uint8>(filename[i]), buffer));
     }
   }
   return result;
@@ -459,25 +452,6 @@ void PrintHandlingOptionalStaticInitializers(
 }
 
 
-static bool HasMapFields(const Descriptor* descriptor) {
-  for (int i = 0; i < descriptor->field_count(); ++i) {
-    if (descriptor->field(i)->is_map()) {
-      return true;
-    }
-  }
-  for (int i = 0; i < descriptor->nested_type_count(); ++i) {
-    if (HasMapFields(descriptor->nested_type(i))) return true;
-  }
-  return false;
-}
-
-bool HasMapFields(const FileDescriptor* file) {
-  for (int i = 0; i < file->message_type_count(); ++i) {
-    if (HasMapFields(file->message_type(i))) return true;
-  }
-  return false;
-}
-
 static bool HasEnumDefinitions(const Descriptor* message_type) {
   if (message_type->enum_type_count() > 0) return true;
   for (int i = 0; i < message_type->nested_type_count(); ++i) {
@@ -512,13 +486,6 @@ bool IsStringOrMessage(const FieldDescriptor* field) {
 
   GOOGLE_LOG(FATAL) << "Can't get here.";
   return false;
-}
-
-FieldOptions::CType EffectiveStringCType(const FieldDescriptor* field) {
-  GOOGLE_DCHECK(field->cpp_type() == FieldDescriptor::CPPTYPE_STRING);
-  // Open-source protobuf release only supports STRING ctype.
-  return FieldOptions::STRING;
-
 }
 
 }  // namespace cpp

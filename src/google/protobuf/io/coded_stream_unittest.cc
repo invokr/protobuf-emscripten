@@ -144,7 +144,6 @@ uint8 CodedStreamTest::buffer_[CodedStreamTest::kBufferSize];
 // checks.
 const int kBlockSizes[] = {1, 2, 3, 5, 7, 13, 32, 1024};
 
-
 // -------------------------------------------------------------------
 // Varint tests.
 
@@ -502,11 +501,11 @@ struct Fixed64Case {
 };
 
 inline std::ostream& operator<<(std::ostream& os, const Fixed32Case& c) {
-  return os << "0x" << std::hex << c.value << std::dec;
+  return os << "0x" << hex << c.value << dec;
 }
 
 inline std::ostream& operator<<(std::ostream& os, const Fixed64Case& c) {
-  return os << "0x" << std::hex << c.value << std::dec;
+  return os << "0x" << hex << c.value << dec;
 }
 
 Fixed32Case kFixed32Cases[] = {

@@ -35,9 +35,6 @@
 #include <google/protobuf/compiler/java/java_file.h>
 
 #include <memory>
-#ifndef _SHARED_PTR_H
-#include <google/protobuf/stubs/shared_ptr.h>
-#endif
 
 #include <google/protobuf/compiler/java/java_context.h>
 #include <google/protobuf/compiler/java/java_enum.h>
@@ -121,7 +118,7 @@ void CollectExtensions(const FileDescriptorProto& file_proto,
            "descriptor.proto is not in the transitive dependencies. "
            "This normally should not happen. Please report a bug.";
     DynamicMessageFactory factory;
-    google::protobuf::scoped_ptr<Message> dynamic_file_proto(
+    scoped_ptr<Message> dynamic_file_proto(
         factory.GetPrototype(file_proto_desc)->New());
     GOOGLE_CHECK(dynamic_file_proto.get() != NULL);
     GOOGLE_CHECK(dynamic_file_proto->ParseFromString(file_data));
@@ -146,9 +143,9 @@ FileGenerator::FileGenerator(const FileDescriptor* file, bool immutable_api)
     : file_(file),
       java_package_(FileJavaPackage(file, immutable_api)),
       message_generators_(
-          new google::protobuf::scoped_ptr<MessageGenerator>[file->message_type_count()]),
+          new scoped_ptr<MessageGenerator>[file->message_type_count()]),
       extension_generators_(
-          new google::protobuf::scoped_ptr<ExtensionGenerator>[file->extension_count()]),
+          new scoped_ptr<ExtensionGenerator>[file->extension_count()]),
       context_(new Context(file)),
       name_resolver_(context_->GetNameResolver()),
       immutable_api_(immutable_api) {
@@ -182,6 +179,29 @@ bool FileGenerator::Validate(string* error) {
       "Please either rename the type or use the java_outer_classname "
       "option to specify a different outer class name for the .proto file.");
     return false;
+  }
+  // If java_outer_classname option is not set and the default outer class name
+  // conflicts with a type defined in the message, we will append a suffix to
+  // avoid the conflict. This allows proto1 API protos to be dual-compiled into
+  // proto2 API without code change. When this happens we'd like to issue an
+  // warning to let the user know that the outer class name has been changed.
+  // Although we only do this automatic naming fix for immutable API, mutable
+  // outer class name will also be affected as it's contructed from immutable
+  // outer class name with an additional "Mutable" prefix. Since the naming
+  // change in mutable API is not caused by a naming conflict, we generate the
+  // warning for immutable API only.
+  if (immutable_api_ && !file_->options().has_java_outer_classname()) {
+    string default_classname =
+        name_resolver_->GetFileDefaultImmutableClassName(file_);
+    if (default_classname != classname_) {
+      GOOGLE_LOG(WARNING) << file_->name() << ": The default outer class name, \""
+                   << default_classname << "\", conflicts with a type "
+                   << "declared in the proto file and an alternative outer "
+                   << "class name is used: \"" << classname_ << "\". To avoid "
+                   << "this warning, please use the java_outer_classname "
+                   << "option to specify a different outer class name for "
+                   << "the .proto file.";
+    }
   }
   return true;
 }
@@ -240,7 +260,7 @@ void FileGenerator::Generate(io::Printer* printer) {
     }
     if (HasGenericServices(file_)) {
       for (int i = 0; i < file_->service_count(); i++) {
-        google::protobuf::scoped_ptr<ServiceGenerator> generator(
+        scoped_ptr<ServiceGenerator> generator(
             generator_factory_->NewServiceGenerator(file_->service(i)));
         generator->Generate(printer);
       }
@@ -303,7 +323,6 @@ void FileGenerator::GenerateDescriptorInitializationCodeForImmutable(
   SharedCodeGenerator shared_code_generator(file_);
   shared_code_generator.GenerateDescriptors(printer);
 
-
   for (int i = 0; i < file_->message_type_count(); i++) {
     message_generators_[i]->GenerateStaticVariableInitializers(printer);
   }
@@ -340,7 +359,7 @@ void FileGenerator::GenerateDescriptorInitializationCodeForImmutable(
       "com.google.protobuf.ExtensionRegistry registry =\n"
       "    com.google.protobuf.ExtensionRegistry.newInstance();\n");
     for (int i = 0; i < extensions.size(); i++) {
-      google::protobuf::scoped_ptr<ExtensionGenerator> generator(
+      scoped_ptr<ExtensionGenerator> generator(
           generator_factory_->NewExtensionGenerator(extensions[i]));
       generator->GenerateRegistrationCode(printer);
     }
@@ -444,7 +463,7 @@ static void GenerateSibling(const string& package_dir,
   string filename = package_dir + descriptor->name() + name_suffix + ".java";
   file_list->push_back(filename);
 
-  google::protobuf::scoped_ptr<io::ZeroCopyOutputStream> output(context->Open(filename));
+  scoped_ptr<io::ZeroCopyOutputStream> output(context->Open(filename));
   io::Printer printer(output.get(), '$');
 
   printer.Print(
@@ -492,7 +511,7 @@ void FileGenerator::GenerateSiblings(const string& package_dir,
     }
     if (HasGenericServices(file_)) {
       for (int i = 0; i < file_->service_count(); i++) {
-        google::protobuf::scoped_ptr<ServiceGenerator> generator(
+        scoped_ptr<ServiceGenerator> generator(
             generator_factory_->NewServiceGenerator(file_->service(i)));
         GenerateSibling<ServiceGenerator>(package_dir, java_package_,
                                           file_->service(i),

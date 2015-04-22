@@ -243,8 +243,9 @@ GenerateBuildingCode(io::Printer* printer) const {
       "}\n");
 
   printer->Print(variables_,
-      "result.$name$_.set(\n"
-      "    $name$_);\n");
+      "result.$name$_.setByteString(\n"
+      "    $name$_.toByteString(),\n"
+      "    $name$_.getExtensionRegistry());\n");
 }
 
 void ImmutableLazyMessageFieldGenerator::
@@ -424,8 +425,9 @@ GenerateBuildingCode(io::Printer* printer) const {
 
   printer->Print(variables_,
       "result.$oneof_name$_ = new $lazy_type$();\n"
-      "(($lazy_type$) result.$oneof_name$_).set(\n"
-      "    (($lazy_type$) $oneof_name$_));\n");
+      "(($lazy_type$) result.$oneof_name$_).setByteString(\n"
+      "    (($lazy_type$) $oneof_name$_).toByteString(),\n"
+      "    (($lazy_type$) $oneof_name$_).getExtensionRegistry());\n");
   printer->Outdent();
   printer->Print("}\n");
 }

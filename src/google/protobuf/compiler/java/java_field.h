@@ -37,9 +37,6 @@
 
 #include <map>
 #include <memory>
-#ifndef _SHARED_PTR_H
-#include <google/protobuf/stubs/shared_ptr.h>
-#endif
 #include <string>
 
 #include <google/protobuf/stubs/common.h>
@@ -83,7 +80,6 @@ class ImmutableFieldGenerator {
   virtual void GenerateSerializedSizeCode(io::Printer* printer) const = 0;
   virtual void GenerateFieldBuilderInitializationCode(io::Printer* printer)
       const = 0;
-  virtual void GenerateStaticInitializationCode(io::Printer* printer) const {}
 
   virtual void GenerateEqualsCode(io::Printer* printer) const = 0;
   virtual void GenerateHashCode(io::Printer* printer) const = 0;
@@ -109,7 +105,7 @@ class FieldGeneratorMap {
   const Descriptor* descriptor_;
   Context* context_;
   ClassNameResolver* name_resolver_;
-  google::protobuf::scoped_array<google::protobuf::scoped_ptr<FieldGeneratorType> > field_generators_;
+  scoped_array<scoped_ptr<FieldGeneratorType> > field_generators_;
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(FieldGeneratorMap);
 };

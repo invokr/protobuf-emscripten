@@ -30,12 +30,13 @@
 
 package com.google.protobuf;
 
-import protobuf_unittest.LazyFieldsLite.LazyExtension;
 import protobuf_unittest.LazyFieldsLite.LazyInnerMessageLite;
 import protobuf_unittest.LazyFieldsLite.LazyMessageLite;
 import protobuf_unittest.LazyFieldsLite.LazyNestedInnerMessageLite;
 
 import junit.framework.TestCase;
+
+import org.easymock.classextension.EasyMock;
 
 import java.util.ArrayList;
 
@@ -51,10 +52,14 @@ public class LazyMessageLiteTest extends TestCase {
   @Override
   protected void setUp() throws Exception {
     super.setUp();
+
+    originalLazyInnerMessageLiteParser = LazyInnerMessageLite.PARSER;
   }
 
   @Override
   protected void tearDown() throws Exception {
+    LazyInnerMessageLite.PARSER = originalLazyInnerMessageLiteParser;
+
     super.tearDown();
   }
 
@@ -287,21 +292,28 @@ public class LazyMessageLiteTest extends TestCase {
     assertEquals(bytes, deserialized.toByteString());
   }
 
-  public void testExtensions() throws Exception {
-    LazyInnerMessageLite.Builder innerBuilder = LazyInnerMessageLite.newBuilder();
-    innerBuilder.setExtension(
-        LazyExtension.extension, LazyExtension.newBuilder()
-        .setName("name").build());
-    assertTrue(innerBuilder.hasExtension(LazyExtension.extension));
-    assertEquals("name", innerBuilder.getExtension(LazyExtension.extension).getName());
+  public void testLaziness() throws InvalidProtocolBufferException {
+    LazyInnerMessageLite inner = LazyInnerMessageLite.newBuilder()
+        .setNum(2)
+        .build();
+    LazyMessageLite outer = LazyMessageLite.newBuilder()
+        .setNum(1)
+        .setInner(inner)
+        .setOneofInner(inner)
+        .build();
+    ByteString bytes = outer.toByteString();
 
-    LazyInnerMessageLite innerMessage = innerBuilder.build();
-    assertTrue(innerMessage.hasExtension(LazyExtension.extension));
-    assertEquals("name", innerMessage.getExtension(LazyExtension.extension).getName());
 
-    LazyMessageLite lite = LazyMessageLite.newBuilder()
-        .setInner(innerMessage).build();
-    assertTrue(lite.getInner().hasExtension(LazyExtension.extension));
-    assertEquals("name", lite.getInner().getExtension(LazyExtension.extension).getName());
+    // The parser for inner / oneofInner message shouldn't be used if
+    // getInner / getOneofInner is not called.
+    LazyInnerMessageLite.PARSER = EasyMock.createStrictMock(Parser.class);
+
+    EasyMock.replay(LazyInnerMessageLite.PARSER);
+
+    LazyMessageLite deserialized = LazyMessageLite.parseFrom(bytes);
+    assertEquals(1, deserialized.getNum());
+    assertEquals(421,  deserialized.getNumWithDefault());
+
+    EasyMock.verify(LazyInnerMessageLite.PARSER);
   }
 }

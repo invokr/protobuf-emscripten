@@ -40,9 +40,6 @@
 
 #include <map>
 #include <memory>
-#ifndef _SHARED_PTR_H
-#include <google/protobuf/stubs/shared_ptr.h>
-#endif
 #include <string>
 #include <vector>
 
@@ -271,27 +268,15 @@ class LIBPROTOBUF_EXPORT TextFormat {
 
     bool print_message_fields_in_index_order_;
 
-    google::protobuf::scoped_ptr<const FieldValuePrinter> default_field_value_printer_;
+    scoped_ptr<const FieldValuePrinter> default_field_value_printer_;
     typedef map<const FieldDescriptor*,
                 const FieldValuePrinter*> CustomPrinterMap;
     CustomPrinterMap custom_printers_;
   };
 
   // Parses a text-format protocol message from the given input stream to
-  // the given message object. This function parses the human-readable format
-  // written by Print(). Returns true on success. The message is cleared first,
-  // even if the function fails -- See Merge() to avoid this behavior.
-  //
-  // Example input: "user {\n id: 123 extra { gender: MALE language: 'en' }\n}"
-  //
-  // One use for this function is parsing handwritten strings in test code.
-  // Another use is to parse the output from google::protobuf::Message::DebugString()
-  // (or ShortDebugString()), because these functions output using
-  // google::protobuf::TextFormat::Print().
-  //
-  // If you would like to read a protocol buffer serialized in the
-  // (non-human-readable) binary wire format, see
-  // google::protobuf::MessageLite::ParseFromString().
+  // the given message object.  This function parses the format written
+  // by Print().
   static bool Parse(io::ZeroCopyInputStream* input, Message* output);
   // Like Parse(), but reads directly from a string.
   static bool ParseFromString(const string& input, Message* output);

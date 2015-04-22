@@ -18,7 +18,7 @@
 		<Configuration
 			Name="Debug|Win32"
 			OutputDirectory="Debug"
-			IntermediateDirectory="$(OutDir)\$(ProjectName)"
+			IntermediateDirectory="Debug"
 			ConfigurationType="4"
 			>
 			<Tool
@@ -81,7 +81,7 @@
 		<Configuration
 			Name="Release|Win32"
 			OutputDirectory="Release"
-			IntermediateDirectory="$(OutDir)\$(ProjectName)"
+			IntermediateDirectory="Release"
 			ConfigurationType="4"
 			>
 			<Tool
@@ -164,10 +164,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\google\protobuf\stubs\pbconfig.h"
-				>
-			</File>
-			<File
 				RelativePath="..\src\google\protobuf\extension_set.h"
 				>
 			</File>
@@ -183,9 +179,6 @@
 				RelativePath="..\src\google\protobuf\stubs\map-util.h"
 				>
 			</File>
-			<File RelativePath="..\src\google\protobuf\generated_enum_util.h"></File>
-			<File RelativePath="..\src\google\protobuf\map_entry_lite.h"></File>
-			<File RelativePath="..\src\google\protobuf\map_field_lite.h"></File>
 			<File
 				RelativePath="..\src\google\protobuf\message_lite.h"
 				>
@@ -255,31 +248,11 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath="..\src\google\protobuf\stubs\atomicops_internals_x86_gcc.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\stubs\atomicops_internals_x86_msvc.cc"
+				RelativePath="..\src\google\protobuf\io\coded_stream.cc"
 				>
 			</File>
 			<File
 				RelativePath="..\src\google\protobuf\stubs\common.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\stubs\once.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\stubs\stringprintf.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\arena.cc"
-				>
-			</File>
-			<File
-				RelativePath="..\src\google\protobuf\arenastring.cc"
 				>
 			</File>
 			<File
@@ -295,6 +268,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\src\google\protobuf\stubs\once.cc"
+				>
+			</File>
+			<File
+				RelativePath="..\src\google\protobuf\stubs\atomicops_internals_x86_msvc.cc"
+				>
+			</File>
+			<File
 				RelativePath="..\src\google\protobuf\repeated_field.cc"
 				>
 			</File>
@@ -303,15 +284,15 @@
 				>
 			</File>
 			<File
-				RelativePath="..\src\google\protobuf\io\coded_stream.cc"
-				>
-			</File>
-			<File
 				RelativePath="..\src\google\protobuf\io\zero_copy_stream.cc"
 				>
 			</File>
 			<File
 				RelativePath="..\src\google\protobuf\io\zero_copy_stream_impl_lite.cc"
+				>
+			</File>
+			<File
+				RelativePath="..\src\google\protobuf\stubs\stringprintf.cc"
 				>
 			</File>
 		</Filter>

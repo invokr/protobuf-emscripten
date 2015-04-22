@@ -41,7 +41,6 @@
 #include <google/protobuf/stubs/shared_ptr.h>
 #endif
 
-#include <google/protobuf/descriptor.h>
 
 namespace google {
 namespace protobuf {
@@ -52,6 +51,7 @@ using internal::shared_ptr;
 
 namespace python {
 
+struct CFieldDescriptor;
 struct CMessage;
 
 typedef struct RepeatedScalarContainer {
@@ -73,21 +73,15 @@ typedef struct RepeatedScalarContainer {
   // modifying the container.
   CMessage* parent;
 
-  // Pointer to the parent's descriptor that describes this
+  // Weak reference to the parent's descriptor that describes this
   // field.  Used together with the parent's message when making a
   // default message instance mutable.
-  // The pointer is owned by the global DescriptorPool.
-  const FieldDescriptor* parent_field_descriptor;
+  CFieldDescriptor* parent_field;
 } RepeatedScalarContainer;
 
 extern PyTypeObject RepeatedScalarContainer_Type;
 
 namespace repeated_scalar_container {
-
-// Builds a RepeatedScalarContainer object, from a parent message and a
-// field descriptor.
-extern PyObject *NewContainer(
-    CMessage* parent, const FieldDescriptor* parent_field_descriptor);
 
 // Appends the scalar 'item' to the end of the container 'self'.
 //

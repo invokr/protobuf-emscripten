@@ -35,8 +35,8 @@ import com.google.protobuf.Descriptors.EnumValueDescriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.Descriptors.OneofDescriptor;
 
-import java.io.IOException;
 import java.io.InputStream;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -59,7 +59,7 @@ public final class DynamicMessage extends AbstractMessage {
    * oneofCases stores the FieldDescriptor for each oneof to indicate
    * which field is set. Caller should make sure the array is immutable.
    *
-   * This constructor is package private and will be used in
+   * This contructor is package private and will be used in
    * {@code DynamicMutableMessage} to convert a mutable message to an immutable
    * message.
    */
@@ -549,22 +549,12 @@ public final class DynamicMessage extends AbstractMessage {
     }
 
     public Builder setUnknownFields(UnknownFieldSet unknownFields) {
-      if (getDescriptorForType().getFile().getSyntax()
-          == Descriptors.FileDescriptor.Syntax.PROTO3) {
-        // Proto3 discards unknown fields.
-        return this;
-      }
       this.unknownFields = unknownFields;
       return this;
     }
 
     @Override
     public Builder mergeUnknownFields(UnknownFieldSet unknownFields) {
-      if (getDescriptorForType().getFile().getSyntax()
-          == Descriptors.FileDescriptor.Syntax.PROTO3) {
-        // Proto3 discards unknown fields.
-        return this;
-      }
       this.unknownFields =
         UnknownFieldSet.newBuilder(this.unknownFields)
                        .mergeFrom(unknownFields)
@@ -598,15 +588,10 @@ public final class DynamicMessage extends AbstractMessage {
         throw new IllegalArgumentException(
           "DynamicMessage should use EnumValueDescriptor to set Enum Value.");
       }
-      // TODO(xiaofeng): Re-enable this check after Orgstore is fixed to not
-      // set incorrect EnumValueDescriptors.
-      // EnumDescriptor fieldType = field.getEnumType();
-      // EnumDescriptor fieldValueType = ((EnumValueDescriptor) value).getType();
-      // if (fieldType != fieldValueType) {
-      //  throw new IllegalArgumentException(String.format(
-      //      "EnumDescriptor %s of field doesn't match EnumDescriptor %s of field value",
-      //      fieldType.getFullName(), fieldValueType.getFullName()));
-      // }
+      if (field.getEnumType() != ((EnumValueDescriptor) value).getType()) {
+        throw new IllegalArgumentException(
+          "EnumValueDescriptor doesn't much Enum Field.");
+      }
     }
 
     /** Verifies the value for an enum field. */
@@ -632,13 +617,6 @@ public final class DynamicMessage extends AbstractMessage {
       // TODO(xiangl): need implementation for dynamic message
       throw new UnsupportedOperationException(
         "getFieldBuilder() called on a dynamic message type.");
-    }
-
-    @Override
-    public com.google.protobuf.Message.Builder getRepeatedFieldBuilder(FieldDescriptor field,
-        int index) {
-      throw new UnsupportedOperationException(
-        "getRepeatedFieldBuilder() called on a dynamic message type.");
     }
   }
 }

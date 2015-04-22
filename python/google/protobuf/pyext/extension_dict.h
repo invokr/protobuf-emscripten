@@ -41,6 +41,7 @@
 #include <google/protobuf/stubs/shared_ptr.h>
 #endif
 
+
 namespace google {
 namespace protobuf {
 
@@ -52,26 +53,13 @@ using internal::shared_ptr;
 namespace python {
 
 struct CMessage;
+struct CFieldDescriptor;
 
 typedef struct ExtensionDict {
   PyObject_HEAD;
-
-  // This is the top-level C++ Message object that owns the whole
-  // proto tree.  Every Python container class holds a
-  // reference to it in order to keep it alive as long as there's a
-  // Python object that references any part of the tree.
   shared_ptr<Message> owner;
-
-  // Weak reference to parent message. Used to make sure
-  // the parent is writable when an extension field is modified.
   CMessage* parent;
-
-  // Pointer to the C++ Message that this ExtensionDict extends.
-  // Not owned by us.
   Message* message;
-
-  // A dict of child messages, indexed by Extension descriptors.
-  // Similar to CMessage::composite_fields.
   PyObject* values;
 } ExtensionDict;
 
@@ -79,8 +67,11 @@ extern PyTypeObject ExtensionDict_Type;
 
 namespace extension_dict {
 
-// Builds an Extensions dict for a specific message.
-ExtensionDict* NewExtensionDict(CMessage *parent);
+// Gets the _cdescriptor reference to a CFieldDescriptor object given a
+// python descriptor object.
+//
+// Returns a new reference.
+CFieldDescriptor* InternalGetCDescriptorFromExtension(PyObject* extension);
 
 // Gets the number of extension values in this ExtensionDict as a python object.
 //
@@ -93,7 +84,7 @@ PyObject* len(ExtensionDict* self);
 // Returns 0 on success, -1 on failure.
 int ReleaseExtension(ExtensionDict* self,
                      PyObject* extension,
-                     const FieldDescriptor* descriptor);
+                     const google::protobuf::FieldDescriptor* descriptor);
 
 // Gets an extension from the dict for the given extension descriptor.
 //

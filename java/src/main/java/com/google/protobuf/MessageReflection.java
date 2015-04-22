@@ -45,14 +45,13 @@ import java.util.TreeMap;
  */
 class MessageReflection {
 
-  static void writeMessageTo(
-      Message message,
-      Map<FieldDescriptor, Object> fields,
-      CodedOutputStream output,
+  static void writeMessageTo(Message message, CodedOutputStream output,
       boolean alwaysWriteRequiredFields)
       throws IOException {
     final boolean isMessageSet =
         message.getDescriptorForType().getOptions().getMessageSetWireFormat();
+
+    Map<FieldDescriptor, Object> fields = message.getAllFields();
     if (alwaysWriteRequiredFields) {
       fields = new TreeMap<FieldDescriptor, Object>(fields);
       for (final FieldDescriptor field :
@@ -83,15 +82,13 @@ class MessageReflection {
     }
   }
 
-  static int getSerializedSize(
-      Message message,
-      Map<FieldDescriptor, Object> fields) {
+  static int getSerializedSize(Message message) {
     int size = 0;
     final boolean isMessageSet =
         message.getDescriptorForType().getOptions().getMessageSetWireFormat();
 
     for (final Map.Entry<Descriptors.FieldDescriptor, Object> entry :
-        fields.entrySet()) {
+        message.getAllFields().entrySet()) {
       final Descriptors.FieldDescriptor field = entry.getKey();
       final Object value = entry.getValue();
       if (isMessageSet && field.isExtension() &&
@@ -343,12 +340,14 @@ class MessageReflection {
         ByteString bytes, ExtensionRegistryLite registry,
         Descriptors.FieldDescriptor descriptor, Message defaultInstance)
         throws IOException;
-
+    
     /**
-     * Returns the UTF8 validation level for the field.
+     * Read a primitive field from input. Note that builders and mutable
+     * messages may use different Java types to represent a primtive field.
      */
-    WireFormat.Utf8Validation getUtf8Validation(Descriptors.FieldDescriptor
-        descriptor);
+    Object readPrimitiveField(
+        CodedInputStream input, WireFormat.FieldType type,
+        boolean checkUtf8) throws IOException;
 
     /**
      * Returns a new merge target for a sub-field. When defaultInstance is
@@ -514,18 +513,11 @@ class MessageReflection {
         return new BuilderAdapter(builder.newBuilderForField(field));
       }
     }
-
-    public WireFormat.Utf8Validation
-        getUtf8Validation(Descriptors.FieldDescriptor descriptor) {
-      if (descriptor.needsUtf8Check()) {
-        return WireFormat.Utf8Validation.STRICT;
-      }
-      // TODO(liujisi): support lazy strings for repeated fields.
-      if (!descriptor.isRepeated()
-          && builder instanceof GeneratedMessage.Builder) {
-        return WireFormat.Utf8Validation.LAZY;
-      }
-      return WireFormat.Utf8Validation.LOOSE;
+    
+    public Object readPrimitiveField(
+        CodedInputStream input, WireFormat.FieldType type,
+        boolean checkUtf8) throws IOException {
+      return FieldSet.readPrimitiveField(input, type, checkUtf8);
     }
 
     public Object finish() {
@@ -659,14 +651,11 @@ class MessageReflection {
       throw new UnsupportedOperationException(
           "newMergeTargetForField() called on FieldSet object");
     }
-
-    public WireFormat.Utf8Validation
-        getUtf8Validation(Descriptors.FieldDescriptor descriptor) {
-      if (descriptor.needsUtf8Check()) {
-        return WireFormat.Utf8Validation.STRICT;
-      }
-      // TODO(liujisi): support lazy strings for ExtesnsionSet.
-      return WireFormat.Utf8Validation.LOOSE;
+    
+    public Object readPrimitiveField(
+        CodedInputStream input, WireFormat.FieldType type,
+        boolean checkUtf8) throws IOException {
+      return FieldSet.readPrimitiveField(input, type, checkUtf8);
     }
 
     public Object finish() {
@@ -763,23 +752,18 @@ class MessageReflection {
       if (field.getLiteType() == WireFormat.FieldType.ENUM) {
         while (input.getBytesUntilLimit() > 0) {
           final int rawValue = input.readEnum();
-          if (field.getFile().supportsUnknownEnumValue()) {
-            target.addRepeatedField(field,
-                field.getEnumType().findValueByNumberCreatingIfUnknown(rawValue));
-          } else {
-            final Object value = field.getEnumType().findValueByNumber(rawValue);
-            if (value == null) {
-              // If the number isn't recognized as a valid value for this
-              // enum, drop it (don't even add it to unknownFields).
-              return true;
-            }
-            target.addRepeatedField(field, value);
+          final Object value = field.getEnumType().findValueByNumber(rawValue);
+          if (value == null) {
+            // If the number isn't recognized as a valid value for this
+            // enum, drop it (don't even add it to unknownFields).
+            return true;
           }
+          target.addRepeatedField(field, value);
         }
       } else {
         while (input.getBytesUntilLimit() > 0) {
-          final Object value = WireFormat.readPrimitiveField(
-              input, field.getLiteType(), target.getUtf8Validation(field));
+          final Object value =
+              target.readPrimitiveField(input, field.getLiteType(), field.needsUtf8Check());
           target.addRepeatedField(field, value);
         }
       }
@@ -799,21 +783,16 @@ class MessageReflection {
         }
         case ENUM:
           final int rawValue = input.readEnum();
-          if (field.getFile().supportsUnknownEnumValue()) {
-            value = field.getEnumType().findValueByNumberCreatingIfUnknown(rawValue);
-          } else {
-            value = field.getEnumType().findValueByNumber(rawValue);
-            // If the number isn't recognized as a valid value for this enum,
-            // drop it.
-            if (value == null) {
-              unknownFields.mergeVarintField(fieldNumber, rawValue);
-              return true;
-            }
+          value = field.getEnumType().findValueByNumber(rawValue);
+          // If the number isn't recognized as a valid value for this enum,
+          // drop it.
+          if (value == null) {
+            unknownFields.mergeVarintField(fieldNumber, rawValue);
+            return true;
           }
           break;
         default:
-          value = WireFormat.readPrimitiveField(
-              input, field.getLiteType(), target.getUtf8Validation(field));
+          value = target.readPrimitiveField(input, field.getLiteType(), field.needsUtf8Check());
           break;
       }
 

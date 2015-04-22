@@ -482,13 +482,6 @@ TEST_F(UnknownFieldSetTest, UnknownEnumValue) {
   }
 }
 
-TEST_F(UnknownFieldSetTest, SpaceUsedExcludingSelf) {
-  UnknownFieldSet empty;
-  empty.AddVarint(1, 0);
-  EXPECT_EQ(sizeof(vector<UnknownField>) + sizeof(UnknownField),
-            empty.SpaceUsedExcludingSelf());
-}
-
 TEST_F(UnknownFieldSetTest, SpaceUsed) {
   unittest::TestEmptyMessage empty_message;
 

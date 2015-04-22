@@ -111,10 +111,6 @@ void EnumGenerator::Generate(io::Printer* printer) {
       "$name$($index$, $number$),\n");
   }
 
-  if (SupportUnknownEnumValue(descriptor_->file())) {
-    printer->Print("UNRECOGNIZED(-1, -1),\n");
-  }
-
   printer->Print(
     ";\n"
     "\n");
@@ -145,17 +141,7 @@ void EnumGenerator::Generate(io::Printer* printer) {
 
   printer->Print(
     "\n"
-    "public final int getNumber() {\n");
-  if (SupportUnknownEnumValue(descriptor_->file())) {
-    printer->Print(
-      "  if (index == -1) {\n"
-      "    throw new java.lang.IllegalArgumentException(\n"
-      "        \"Can't get the number of an unknown enum value.\");\n"
-      "  }\n");
-  }
-  printer->Print(
-    "  return value;\n"
-    "}\n"
+    "public final int getNumber() { return value; }\n"
     "\n"
     "public static $classname$ valueOf(int value) {\n"
     "  switch (value) {\n",
@@ -245,12 +231,11 @@ void EnumGenerator::Generate(io::Printer* printer) {
             "index", SimpleItoa(descriptor_->index()));
         }
         printer->Print(
-          "return $immutable_package$.$descriptor_class$.$descriptor$\n"
+          "return $immutable_package$.$descriptor_class$.getDescriptor()\n"
           "    .getEnumTypes().get($index$);\n",
           "immutable_package", FileJavaPackage(descriptor_->file(), true),
           "descriptor_class",
           name_resolver_->GetDescriptorClassName(descriptor_->file()),
-          "descriptor", "getDescriptor()",
           "index", SimpleItoa(descriptor_->index()));
         printer->Outdent();
       }
@@ -298,18 +283,11 @@ void EnumGenerator::Generate(io::Printer* printer) {
       "  if (desc.getType() != getDescriptor()) {\n"
       "    throw new java.lang.IllegalArgumentException(\n"
       "      \"EnumValueDescriptor is not for this type.\");\n"
-      "  }\n",
-      "classname", descriptor_->name());
-    if (SupportUnknownEnumValue(descriptor_->file())) {
-      printer->Print(
-        "  if (desc.getIndex() == -1) {\n"
-        "    return UNRECOGNIZED;\n"
-        "  }\n");
-    }
-    printer->Print(
+      "  }\n"
       "  return VALUES[desc.getIndex()];\n"
       "}\n"
-      "\n");
+      "\n",
+      "classname", descriptor_->name());
 
     // index is only used for reflection; lite implementation does not need it
     printer->Print("private final int index;\n");

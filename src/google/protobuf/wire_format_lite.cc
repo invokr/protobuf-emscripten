@@ -55,16 +55,11 @@ const int WireFormatLite::kMessageSetMessageTag;
 
 #endif
 
-// IBM xlC requires prefixing constants with WireFormatLite::
 const int WireFormatLite::kMessageSetItemTagsSize =
-  io::CodedOutputStream::StaticVarintSize32<
-      WireFormatLite::kMessageSetItemStartTag>::value +
-  io::CodedOutputStream::StaticVarintSize32<
-      WireFormatLite::kMessageSetItemEndTag>::value +
-  io::CodedOutputStream::StaticVarintSize32<
-      WireFormatLite::kMessageSetTypeIdTag>::value +
-  io::CodedOutputStream::StaticVarintSize32<
-      WireFormatLite::kMessageSetMessageTag>::value;
+  io::CodedOutputStream::StaticVarintSize32<kMessageSetItemStartTag>::value +
+  io::CodedOutputStream::StaticVarintSize32<kMessageSetItemEndTag>::value +
+  io::CodedOutputStream::StaticVarintSize32<kMessageSetTypeIdTag>::value +
+  io::CodedOutputStream::StaticVarintSize32<kMessageSetMessageTag>::value;
 
 const WireFormatLite::CppType
 WireFormatLite::kFieldTypeToCppTypeMap[MAX_FIELD_TYPE + 1] = {
@@ -296,36 +291,8 @@ bool WireFormatLite::ReadPackedEnumNoInline(io::CodedInputStream* input,
         int, WireFormatLite::TYPE_ENUM>(input, &value)) {
       return false;
     }
-    if (is_valid == NULL || is_valid(value)) {
+    if (is_valid(value)) {
       values->Add(value);
-    }
-  }
-  input->PopLimit(limit);
-  return true;
-}
-
-bool WireFormatLite::ReadPackedEnumPreserveUnknowns(
-    io::CodedInputStream* input,
-    int field_number,
-    bool (*is_valid)(int),
-    io::CodedOutputStream* unknown_fields_stream,
-    RepeatedField<int>* values) {
-  uint32 length;
-  if (!input->ReadVarint32(&length)) return false;
-  io::CodedInputStream::Limit limit = input->PushLimit(length);
-  while (input->BytesUntilLimit() > 0) {
-    int value;
-    if (!google::protobuf::internal::WireFormatLite::ReadPrimitive<
-        int, WireFormatLite::TYPE_ENUM>(input, &value)) {
-      return false;
-    }
-    if (is_valid == NULL || is_valid(value)) {
-      values->Add(value);
-    } else {
-      uint32 tag = WireFormatLite::MakeTag(field_number,
-                                           WireFormatLite::WIRETYPE_VARINT);
-      unknown_fields_stream->WriteVarint32(tag);
-      unknown_fields_stream->WriteVarint32(value);
     }
   }
   input->PopLimit(limit);
@@ -484,24 +451,19 @@ void WireFormatLite::WriteMessageMaybeToArray(int field_number,
   }
 }
 
-static inline bool ReadBytesToString(io::CodedInputStream* input,
-                                     string* value) GOOGLE_ATTRIBUTE_ALWAYS_INLINE;
-static inline bool ReadBytesToString(io::CodedInputStream* input,
-                                     string* value) {
+bool WireFormatLite::ReadString(io::CodedInputStream* input,
+                                string* value) {
+  // String is for UTF-8 text only
   uint32 length;
-  return input->ReadVarint32(&length) &&
-      input->InternalReadStringInline(value, length);
+  if (!input->ReadVarint32(&length)) return false;
+  if (!input->InternalReadStringInline(value, length)) return false;
+  return true;
 }
-
-bool WireFormatLite::ReadBytes(io::CodedInputStream* input, string* value) {
-  return ReadBytesToString(input, value);
-}
-
-bool WireFormatLite::ReadBytes(io::CodedInputStream* input, string** p) {
-  if (*p == &::google::protobuf::internal::GetEmptyStringAlreadyInited()) {
-    *p = new ::std::string();
-  }
-  return ReadBytesToString(input, *p);
+bool WireFormatLite::ReadBytes(io::CodedInputStream* input,
+                               string* value) {
+  uint32 length;
+  if (!input->ReadVarint32(&length)) return false;
+  return input->InternalReadStringInline(value, length);
 }
 
 }  // namespace internal

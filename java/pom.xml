@@ -10,7 +10,7 @@
   </parent>
   <groupId>com.google.protobuf</groupId>
   <artifactId>protobuf-java</artifactId>
-  <version>3.0.0-alpha-3-pre</version>
+  <version>2.6.1</version>
   <packaging>bundle</packaging>
   <name>Protocol Buffer Java API</name>
   <description>
@@ -130,10 +130,6 @@
                   <arg value="../src/google/protobuf/unittest_lite_imports_nonlite.proto" />
                   <arg value="../src/google/protobuf/unittest_enormous_descriptor.proto" />
                   <arg value="../src/google/protobuf/unittest_no_generic_services.proto" />
-                  <arg value="src/test/java/com/google/protobuf/field_presence_test.proto" />
-                  <arg value="src/test/java/com/google/protobuf/map_for_proto2_lite_test.proto" />
-                  <arg value="src/test/java/com/google/protobuf/map_for_proto2_test.proto" />
-                  <arg value="src/test/java/com/google/protobuf/map_test.proto" />
                 </exec>
               </tasks>
               <testSourceRoot>target/generated-test-sources</testSourceRoot>
@@ -152,71 +148,13 @@
           <instructions>
             <Bundle-DocURL>https://developers.google.com/protocol-buffers/</Bundle-DocURL>
             <Bundle-SymbolicName>com.google.protobuf</Bundle-SymbolicName>
-            <Export-Package>com.google.protobuf;version=3.0.0-alpha-3-pre</Export-Package>
+            <Export-Package>com.google.protobuf;version=2.6.1</Export-Package>
           </instructions>
         </configuration>
       </plugin>
     </plugins>
   </build>
   <profiles>
-    <profile>
-      <id>release</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-source-plugin</artifactId>
-            <version>2.2.1</version>
-            <executions>
-              <execution>
-                <id>attach-sources</id>
-                <goals>
-                  <goal>jar-no-fork</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-javadoc-plugin</artifactId>
-            <version>2.9.1</version>
-            <executions>
-              <execution>
-                <id>attach-javadocs</id>
-                <goals>
-                  <goal>jar</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-gpg-plugin</artifactId>
-            <version>1.5</version>
-            <executions>
-              <execution>
-                <id>sign-artifacts</id>
-                <phase>verify</phase>
-                <goals>
-                  <goal>sign</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-          <plugin>
-            <groupId>org.sonatype.plugins</groupId>
-            <artifactId>nexus-staging-maven-plugin</artifactId>
-            <version>1.6.3</version>
-            <extensions>true</extensions>
-            <configuration>
-               <serverId>sonatype-nexus-staging</serverId>
-               <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-               <autoReleaseAfterClose>false</autoReleaseAfterClose>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
     <profile>
       <id>lite</id>
       <build>
@@ -226,40 +164,35 @@
             <configuration>
               <includes>
                 <include>**/AbstractMessageLite.java</include>
-                <include>**/AbstractParser.java</include>
-                <include>**/BoundedByteString.java</include>
                 <include>**/ByteString.java</include>
                 <include>**/CodedInputStream.java</include>
                 <include>**/CodedOutputStream.java</include>
-                <include>**/ExtensionLite.java</include>
                 <include>**/ExtensionRegistryLite.java</include>
                 <include>**/FieldSet.java</include>
                 <include>**/GeneratedMessageLite.java</include>
                 <include>**/Internal.java</include>
                 <include>**/InvalidProtocolBufferException.java</include>
-                <include>**/LazyFieldLite.java</include>
                 <include>**/LazyStringArrayList.java</include>
                 <include>**/LazyStringList.java</include>
-                <include>**/LiteralByteString.java</include>
-                <include>**/MapEntryLite.java</include>
-                <include>**/MapFieldLite.java</include>
                 <include>**/MessageLite.java</include>
                 <include>**/MessageLiteOrBuilder.java</include>
-                <include>**/Parser.java</include>
-                <include>**/ProtocolStringList.java</include>
-                <include>**/RopeByteString.java</include>
                 <include>**/SmallSortedMap.java</include>
                 <include>**/UninitializedMessageException.java</include>
-                <include>**/UnknownFieldSetLite.java</include>
                 <include>**/UnmodifiableLazyStringList.java</include>
-                <include>**/Utf8.java</include>
                 <include>**/WireFormat.java</include>
+                <include>**/Parser.java</include>
+                <include>**/AbstractParser.java</include>
+                <include>**/BoundedByteString.java</include>
+                <include>**/LiteralByteString.java</include>
+                <include>**/RopeByteString.java</include>
+                <include>**/Utf8.java</include>
+                <include>**/LazyField.java</include>
+                <include>**/LazyFieldLite.java</include>
+                <include>**/ProtocolStringList.java</include>
               </includes>
               <testIncludes>
-                <testInclude>**/*Lite.java</testInclude>
-                <testInclude>**/LazyMessageLiteTest.java</testInclude>
                 <testInclude>**/LiteTest.java</testInclude>
-                <testInclude>**/UnknownFieldSetLiteTest.java</testInclude>
+                <testInclude>**/*Lite.java</testInclude>
               </testIncludes>
             </configuration>
           </plugin>
@@ -267,7 +200,7 @@
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <includes>
-                <include>**/*Test.java</include>
+                <include>**/LiteTest.java</include>
               </includes>
             </configuration>
           </plugin>

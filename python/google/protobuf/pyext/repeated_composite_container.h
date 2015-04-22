@@ -43,6 +43,7 @@
 #include <string>
 #include <vector>
 
+
 namespace google {
 namespace protobuf {
 
@@ -54,17 +55,18 @@ using internal::shared_ptr;
 namespace python {
 
 struct CMessage;
+struct CFieldDescriptor;
 
 // A RepeatedCompositeContainer can be in one of two states: attached
 // or released.
 //
 // When in the attached state all modifications to the container are
 // done both on the 'message' and on the 'child_messages'
-// list.  In this state all Messages referred to by the children in
+// list.  In this state all Messages refered to by the children in
 // 'child_messages' are owner by the 'owner'.
 //
 // When in the released state 'message', 'owner', 'parent', and
-// 'parent_field_descriptor' are NULL.
+// 'parent_field' are NULL.
 typedef struct RepeatedCompositeContainer {
   PyObject_HEAD;
 
@@ -80,8 +82,7 @@ typedef struct RepeatedCompositeContainer {
   CMessage* parent;
 
   // A descriptor used to modify the underlying 'message'.
-  // The pointer is owned by the global DescriptorPool.
-  const FieldDescriptor* parent_field_descriptor;
+  CFieldDescriptor* parent_field;
 
   // Pointer to the C++ Message that contains this container.  The
   // RepeatedCompositeContainer does not own this pointer.
@@ -100,13 +101,6 @@ typedef struct RepeatedCompositeContainer {
 extern PyTypeObject RepeatedCompositeContainer_Type;
 
 namespace repeated_composite_container {
-
-// Builds a RepeatedCompositeContainer object, from a parent message and a
-// field descriptor.
-PyObject *NewContainer(
-    CMessage* parent,
-    const FieldDescriptor* parent_field_descriptor,
-    PyObject *concrete_class);
 
 // Returns the number of items in this repeated composite container.
 static Py_ssize_t Length(RepeatedCompositeContainer* self);
@@ -149,7 +143,8 @@ int AssignSubscript(RepeatedCompositeContainer* self,
 // Releases the messages in the container to the given message.
 //
 // Returns 0 on success, -1 on failure.
-int ReleaseToMessage(RepeatedCompositeContainer* self, Message* new_message);
+int ReleaseToMessage(RepeatedCompositeContainer* self,
+                     google::protobuf::Message* new_message);
 
 // Releases the messages in the container to a new message.
 //

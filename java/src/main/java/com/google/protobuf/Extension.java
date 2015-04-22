@@ -35,16 +35,27 @@ package com.google.protobuf;
  *
  * @author liujisi@google.com (Jisi Liu)
  */
-public abstract class Extension<ContainingType extends MessageLite, Type>
-    extends ExtensionLite<ContainingType, Type> {
+public abstract class Extension<ContainingType extends MessageLite, Type> {
+  /** Returns the field number of the extension. */
+  public abstract int getNumber();
+
+  /** Returns the type of the field. */
+  public abstract WireFormat.FieldType getLiteType();
+
+  /** Returns whether it is a repeated field. */
+  public abstract boolean isRepeated();
 
   /** Returns the descriptor of the extension. */
   public abstract Descriptors.FieldDescriptor getDescriptor();
 
-  /** Returns whether or not this extension is a Lite Extension. */
-  final boolean isLite() {
-    return false;
-  }
+  /** Returns the default value of the extension field. */
+  public abstract Type getDefaultValue();
+
+  /**
+   * Returns the default instance of the extension field, if it's a message
+   * extension.
+   */
+  public abstract MessageLite getMessageDefaultInstance();
 
   // All the methods below are extension implementation details.
 
