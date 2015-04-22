@@ -165,7 +165,9 @@ Atomic64 Release_Load(volatile const Atomic64* ptr);
 #error "Atomic operations are not supported on your platform"
 
 // ThreadSanitizer, http://clang.llvm.org/docs/ThreadSanitizer.html.
-#if defined(THREAD_SANITIZER)
+#if defined(EMSCRIPTEN)
+#include <google/protobuf/stubs/atomicops_internals_emscripten.h>
+#elif defined(THREAD_SANITIZER)
 #include <google/protobuf/stubs/atomicops_internals_tsan.h>
 // MSVC.
 #elif defined(_MSC_VER)
