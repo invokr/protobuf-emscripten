@@ -1,0 +1,230 @@
+From f768f647834a30b88f74ddd3edc045cabea252a2 Mon Sep 17 00:00:00 2001
+From: Robin <me@invokr.org>
+Date: Fri, 7 Oct 2016 12:50:53 +0200
+Subject: [PATCH 2/2] Fix compiler warnings and remove protoc binary (can't
+ build with em)
+
+---
+ 2.6.1/src/Makefile.am | 202 +-------------------------------------------------
+ 1 file changed, 1 insertion(+), 201 deletions(-)
+
+diff --git a/2.6.1/src/Makefile.am b/2.6.1/src/Makefile.am
+index 45ba4d3..c0cf98c 100644
+--- a/2.6.1/src/Makefile.am
++++ b/2.6.1/src/Makefile.am
+@@ -17,7 +17,7 @@ else
+ NO_OPT_CXXFLAGS = $(PTHREAD_CFLAGS)
+ endif
+ 
+-AM_CXXFLAGS = $(NO_OPT_CXXFLAGS) $(PROTOBUF_OPT_FLAG)
++AM_CXXFLAGS = $(NO_OPT_CXXFLAGS) $(PROTOBUF_OPT_FLAG) -Wno-unused-local-typedef
+ 
+ AM_LDFLAGS = $(PTHREAD_CFLAGS)
+ 
+@@ -216,203 +216,3 @@ libprotoc_la_SOURCES =                                         \
+   google/protobuf/compiler/java/java_doc_comment.cc            \
+   google/protobuf/compiler/java/java_doc_comment.h             \
+   google/protobuf/compiler/python/python_generator.cc
+-
+-bin_PROGRAMS = protoc
+-protoc_LDADD = $(PTHREAD_LIBS) libprotobuf.la libprotoc.la
+-protoc_SOURCES = google/protobuf/compiler/main.cc
+-
+-# Tests ==============================================================
+-
+-protoc_inputs =                                                \
+-  google/protobuf/unittest.proto                               \
+-  google/protobuf/unittest_empty.proto                         \
+-  google/protobuf/unittest_import.proto                        \
+-  google/protobuf/unittest_import_public.proto                 \
+-  google/protobuf/unittest_mset.proto                          \
+-  google/protobuf/unittest_optimize_for.proto                  \
+-  google/protobuf/unittest_embed_optimize_for.proto            \
+-  google/protobuf/unittest_custom_options.proto                \
+-  google/protobuf/unittest_lite.proto                          \
+-  google/protobuf/unittest_import_lite.proto                   \
+-  google/protobuf/unittest_import_public_lite.proto            \
+-  google/protobuf/unittest_lite_imports_nonlite.proto          \
+-  google/protobuf/unittest_no_generic_services.proto           \
+-  google/protobuf/compiler/cpp/cpp_test_bad_identifiers.proto
+-
+-EXTRA_DIST =                                                   \
+-  $(protoc_inputs)                                             \
+-  solaris/libstdc++.la                                         \
+-  google/protobuf/io/gzip_stream.h                             \
+-  google/protobuf/io/gzip_stream_unittest.sh                   \
+-  google/protobuf/testdata/golden_message                      \
+-  google/protobuf/testdata/golden_message_oneof_implemented    \
+-  google/protobuf/testdata/golden_packed_fields_message        \
+-  google/protobuf/testdata/bad_utf8_string                     \
+-  google/protobuf/testdata/text_format_unittest_data.txt       \
+-  google/protobuf/testdata/text_format_unittest_data_oneof_implemented.txt  \
+-  google/protobuf/testdata/text_format_unittest_data_pointy.txt             \
+-  google/protobuf/testdata/text_format_unittest_data_pointy_oneof.txt       \
+-  google/protobuf/testdata/text_format_unittest_extensions_data.txt         \
+-  google/protobuf/testdata/text_format_unittest_extensions_data_pointy.txt  \
+-  google/protobuf/package_info.h                               \
+-  google/protobuf/io/package_info.h                            \
+-  google/protobuf/compiler/package_info.h                      \
+-  google/protobuf/compiler/zip_output_unittest.sh              \
+-  google/protobuf/unittest_enormous_descriptor.proto
+-
+-protoc_lite_outputs =                                          \
+-  google/protobuf/unittest_lite.pb.cc                          \
+-  google/protobuf/unittest_lite.pb.h                           \
+-  google/protobuf/unittest_import_lite.pb.cc                   \
+-  google/protobuf/unittest_import_lite.pb.h                    \
+-  google/protobuf/unittest_import_public_lite.pb.cc            \
+-  google/protobuf/unittest_import_public_lite.pb.h
+-
+-protoc_outputs =                                               \
+-  $(protoc_lite_outputs)                                       \
+-  google/protobuf/unittest.pb.cc                               \
+-  google/protobuf/unittest.pb.h                                \
+-  google/protobuf/unittest_empty.pb.cc                         \
+-  google/protobuf/unittest_empty.pb.h                          \
+-  google/protobuf/unittest_import.pb.cc                        \
+-  google/protobuf/unittest_import.pb.h                         \
+-  google/protobuf/unittest_import_public.pb.cc                 \
+-  google/protobuf/unittest_import_public.pb.h                  \
+-  google/protobuf/unittest_mset.pb.cc                          \
+-  google/protobuf/unittest_mset.pb.h                           \
+-  google/protobuf/unittest_optimize_for.pb.cc                  \
+-  google/protobuf/unittest_optimize_for.pb.h                   \
+-  google/protobuf/unittest_embed_optimize_for.pb.cc            \
+-  google/protobuf/unittest_embed_optimize_for.pb.h             \
+-  google/protobuf/unittest_custom_options.pb.cc                \
+-  google/protobuf/unittest_custom_options.pb.h                 \
+-  google/protobuf/unittest_lite_imports_nonlite.pb.cc          \
+-  google/protobuf/unittest_lite_imports_nonlite.pb.h           \
+-  google/protobuf/unittest_no_generic_services.pb.cc           \
+-  google/protobuf/unittest_no_generic_services.pb.h            \
+-  google/protobuf/compiler/cpp/cpp_test_bad_identifiers.pb.cc  \
+-  google/protobuf/compiler/cpp/cpp_test_bad_identifiers.pb.h
+-
+-BUILT_SOURCES = $(protoc_outputs)
+-
+-if USE_EXTERNAL_PROTOC
+-
+-unittest_proto_middleman: $(protoc_inputs)
+-	$(PROTOC) -I$(srcdir) --cpp_out=. $^
+-	touch unittest_proto_middleman
+-
+-else
+-
+-# We have to cd to $(srcdir) before executing protoc because $(protoc_inputs) is
+-# relative to srcdir, which may not be the same as the current directory when
+-# building out-of-tree.
+-unittest_proto_middleman: protoc$(EXEEXT) $(protoc_inputs)
+-	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/protoc$(EXEEXT) -I. --cpp_out=$$oldpwd $(protoc_inputs) )
+-	touch unittest_proto_middleman
+-
+-endif
+-
+-$(protoc_outputs): unittest_proto_middleman
+-
+-COMMON_TEST_SOURCES =                                          \
+-  google/protobuf/test_util.cc                                 \
+-  google/protobuf/test_util.h                                  \
+-  google/protobuf/testing/googletest.cc                        \
+-  google/protobuf/testing/googletest.h                         \
+-  google/protobuf/testing/file.cc                              \
+-  google/protobuf/testing/file.h
+-
+-check_PROGRAMS = protoc protobuf-test protobuf-lazy-descriptor-test \
+-                 protobuf-lite-test test_plugin $(GZCHECKPROGRAMS)
+-protobuf_test_LDADD = $(PTHREAD_LIBS) libprotobuf.la libprotoc.la \
+-                      $(top_builddir)/gtest/lib/libgtest.la       \
+-                      $(top_builddir)/gtest/lib/libgtest_main.la
+-protobuf_test_CPPFLAGS = -I$(top_srcdir)/gtest/include         \
+-                         -I$(top_builddir)/gtest/include
+-# Disable optimization for tests unless the user explicitly asked for it,
+-# since test_util.cc takes forever to compile with optimization (with GCC).
+-# See configure.ac for more info.
+-protobuf_test_CXXFLAGS = $(NO_OPT_CXXFLAGS)
+-protobuf_test_SOURCES =                                        \
+-  google/protobuf/stubs/common_unittest.cc                     \
+-  google/protobuf/stubs/once_unittest.cc                       \
+-  google/protobuf/stubs/strutil_unittest.cc                    \
+-  google/protobuf/stubs/structurally_valid_unittest.cc         \
+-  google/protobuf/stubs/stringprintf_unittest.cc               \
+-  google/protobuf/stubs/template_util_unittest.cc              \
+-  google/protobuf/stubs/type_traits_unittest.cc                \
+-  google/protobuf/descriptor_database_unittest.cc              \
+-  google/protobuf/descriptor_unittest.cc                       \
+-  google/protobuf/dynamic_message_unittest.cc                  \
+-  google/protobuf/extension_set_unittest.cc                    \
+-  google/protobuf/generated_message_reflection_unittest.cc     \
+-  google/protobuf/message_unittest.cc                          \
+-  google/protobuf/reflection_ops_unittest.cc                   \
+-  google/protobuf/repeated_field_unittest.cc                   \
+-  google/protobuf/repeated_field_reflection_unittest.cc        \
+-  google/protobuf/text_format_unittest.cc                      \
+-  google/protobuf/unknown_field_set_unittest.cc                \
+-  google/protobuf/wire_format_unittest.cc                      \
+-  google/protobuf/io/coded_stream_unittest.cc                  \
+-  google/protobuf/io/printer_unittest.cc                       \
+-  google/protobuf/io/tokenizer_unittest.cc                     \
+-  google/protobuf/io/zero_copy_stream_unittest.cc              \
+-  google/protobuf/compiler/command_line_interface_unittest.cc  \
+-  google/protobuf/compiler/importer_unittest.cc                \
+-  google/protobuf/compiler/mock_code_generator.cc              \
+-  google/protobuf/compiler/mock_code_generator.h               \
+-  google/protobuf/compiler/parser_unittest.cc                  \
+-  google/protobuf/compiler/cpp/cpp_bootstrap_unittest.cc       \
+-  google/protobuf/compiler/cpp/cpp_unittest.h                  \
+-  google/protobuf/compiler/cpp/cpp_unittest.cc                 \
+-  google/protobuf/compiler/cpp/cpp_plugin_unittest.cc          \
+-  google/protobuf/compiler/java/java_plugin_unittest.cc        \
+-  google/protobuf/compiler/java/java_doc_comment_unittest.cc   \
+-  google/protobuf/compiler/python/python_plugin_unittest.cc    \
+-  $(COMMON_TEST_SOURCES)
+-nodist_protobuf_test_SOURCES = $(protoc_outputs)
+-
+-# Run cpp_unittest again with PROTOBUF_TEST_NO_DESCRIPTORS defined.
+-protobuf_lazy_descriptor_test_LDADD = $(PTHREAD_LIBS) libprotobuf.la \
+-                      libprotoc.la                                   \
+-                      $(top_builddir)/gtest/lib/libgtest.la          \
+-                      $(top_builddir)/gtest/lib/libgtest_main.la
+-protobuf_lazy_descriptor_test_CPPFLAGS = -I$(top_srcdir)/gtest/include    \
+-                                         -I$(top_builddir)/gtest/include  \
+-                                         -DPROTOBUF_TEST_NO_DESCRIPTORS
+-protobuf_lazy_descriptor_test_CXXFLAGS = $(NO_OPT_CXXFLAGS)
+-protobuf_lazy_descriptor_test_SOURCES =                        \
+-  google/protobuf/compiler/cpp/cpp_unittest.cc                 \
+-  $(COMMON_TEST_SOURCES)
+-nodist_protobuf_lazy_descriptor_test_SOURCES = $(protoc_outputs)
+-
+-# Build lite_unittest separately, since it doesn't use gtest.
+-protobuf_lite_test_LDADD = $(PTHREAD_LIBS) libprotobuf-lite.la
+-protobuf_lite_test_CXXFLAGS = $(NO_OPT_CXXFLAGS)
+-protobuf_lite_test_SOURCES =                                           \
+-  google/protobuf/lite_unittest.cc                                     \
+-  google/protobuf/test_util_lite.cc                                    \
+-  google/protobuf/test_util_lite.h
+-nodist_protobuf_lite_test_SOURCES = $(protoc_lite_outputs)
+-
+-# Test plugin binary.
+-test_plugin_LDADD = $(PTHREAD_LIBS) libprotobuf.la libprotoc.la \
+-                    $(top_builddir)/gtest/lib/libgtest.la
+-test_plugin_CPPFLAGS = -I$(top_srcdir)/gtest/include         \
+-                       -I$(top_builddir)/gtest/include
+-test_plugin_SOURCES =                                          \
+-  google/protobuf/compiler/mock_code_generator.cc              \
+-  google/protobuf/testing/file.cc                              \
+-  google/protobuf/testing/file.h                               \
+-  google/protobuf/compiler/test_plugin.cc
+-
+-if HAVE_ZLIB
+-zcgzip_LDADD = $(PTHREAD_LIBS) libprotobuf.la
+-zcgzip_SOURCES = google/protobuf/testing/zcgzip.cc
+-
+-zcgunzip_LDADD = $(PTHREAD_LIBS) libprotobuf.la
+-zcgunzip_SOURCES = google/protobuf/testing/zcgunzip.cc
+-endif
+-
+-TESTS = protobuf-test protobuf-lazy-descriptor-test protobuf-lite-test \
+-        google/protobuf/compiler/zip_output_unittest.sh $(GZTESTS)
+-- 
+2.6.4 (Apple Git-63)
+
