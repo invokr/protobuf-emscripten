@@ -174,7 +174,7 @@ nobase_include_HEADERS =                                        \
   google/protobuf/util/type_resolver_util.h                     \
   google/protobuf/util/message_differencer.h
 
-lib_LTLIBRARIES = libprotobuf-lite.la libprotobuf.la libprotoc.la
+lib_LTLIBRARIES = libprotobuf-lite.la libprotobuf.la 
 
 libprotobuf_lite_la_LIBADD = $(PTHREAD_LIBS)
 libprotobuf_lite_la_LDFLAGS = -version-info 11:0:0 -export-dynamic -no-undefined
