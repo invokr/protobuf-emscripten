@@ -64,6 +64,7 @@ MAINTAINERCLEANFILES =   \
 nobase_include_HEADERS =                                        \
   google/protobuf/stubs/atomic_sequence_num.h                   \
   google/protobuf/stubs/atomicops.h                             \
+  google/protobuf/stubs/atomicops_internals_emscripten.h        \
   google/protobuf/stubs/atomicops_internals_power.h             \
   google/protobuf/stubs/atomicops_internals_ppc_gcc.h           \
   google/protobuf/stubs/atomicops_internals_arm64_gcc.h         \
@@ -174,7 +175,7 @@ nobase_include_HEADERS =                                        \
   google/protobuf/util/type_resolver_util.h                     \
   google/protobuf/util/message_differencer.h
 
-lib_LTLIBRARIES = libprotobuf-lite.la libprotobuf.la libprotoc.la
+lib_LTLIBRARIES = libprotobuf-lite.la libprotobuf.la 
 
 libprotobuf_lite_la_LIBADD = $(PTHREAD_LIBS)
 libprotobuf_lite_la_LDFLAGS = -version-info 11:0:0 -export-dynamic -no-undefined
